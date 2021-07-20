@@ -304,6 +304,12 @@ class agentThree():
         self.generalReward_history=[]
         self.totalSpeakingReward_history=[]
         self.totalListeningReward_history=[]
+        #optimization objects
+        self.lambda_val=0.001
+        self.value_lr=0.00002
+        self.board_lr=0.00002
+        self.message_lr=0.00002
+        self.optimizer=tf.keras.optimizers.Adam()
         
     def stateConcatThree(self, fullState, msg):
         reward=fullState[2]
@@ -380,6 +386,11 @@ class agentThree():
         self.msgStateHistory.append(state)
         return messageAction, norm_dist
 
+    def stateValue(self, state):
+        value=self.value_model(tensor_conversion(state,False))
+        value=numpy_conversion(value)
+        return value
+
     def updateParameters(self,oldAbsoluteState3,absoluteState3,currentStateValue1,currentStateValue2,oldStateValue1,oldStateValue2,reward):
         ####This code adds the relation values to the general reward####
         (boardReward,generalReward,totalSpeakingReward,totalListeningReward)=reward
@@ -398,6 +409,19 @@ class agentThree():
         self.generalReward_history.append(generalReward)
         self.totalSpeakingReward_history.append(totalSpeakingReward)
         self.totalListeningReward_history.append(totalListeningReward)
+
+        overall_reward=boardReward+generalReward+totalSpeakingReward+totalListeningReward
+        overall_board_reward=boardReward+generalReward
+        overall_message_reward=generalReward+totalSpeakingReward+totalListeningReward
+
+        value_error=overall_reward+(self.lambda_val*stateValue(absoluteState3))-stateValue(absoluteState3)
+        value_error_board=overall_board_reward+(self.lambda_val*stateValue(absoluteState3))-stateValue(absoluteState3)
+        value_error_message=overall_message_reward+(self.lambda_val*stateValue(absoluteState3))-stateValue(absoluteState3)
+        loss_board=self.board_lr*value_error_board*
+        loss_message=""
+
+        with tf.GradientTape() as tape:
+            #do some cool stuff here
 
         return relations
         
@@ -748,7 +772,7 @@ while True:
         absoluteState1=agentOne.stateConcatOne(fullState)
         #get actions
         (boardAction,normDistBoard)=agentOne.boardAction(absoluteState1)
-        (messageAction,normDistMessage)=agentTwo.messageAction(absoluteState1)
+        (messageAction,normDistMessage)=agentOne.messageAction(absoluteState1)
         #get rewards
         (currentState, isTerminal, boardReward, generalReward)=checkers.envStepBoard(boardAction)
         (totalSpeakingReward, totalListeningReward)=checkers.envStepMessage(agentOne.msgStateHistory,agentOne.message_history_self,agentOne.action_history_self,agentOne.external_message_history)
