@@ -37,6 +37,16 @@ def softmax(X):
 def swish(X):
     return X/(1+np.exp(-X))
 
+def flatten(matrix):
+    try:
+        while matrix.ndim!=1:
+            matrix=matrix.flatten()
+    except:
+        matrix=matrix[0]
+        while matrix.ndim!=1:
+            matrix=matrix.flatten()
+    return matrix
+
 #derivative of tanh
 def tanh_derivative(X):
     return 1-(X**2)
@@ -941,7 +951,17 @@ class agentOne():
         p2=[stepSizeBoard-x for x in mean_board]
         p3=np.multiply(p1,p2)
         self.board_policy_biases=self.board_policy_biases+[stepSizeBoard*x for x in p3]
-        p4=np.matmul(np.array(list(zip(p3))),np.transpose(np.array(list(zip(oldAbsoluteState1)))))
+        #
+        #
+        #
+        #THERE WAS A CHANGE HERE
+        #
+        #
+        #
+        p3=flatten(p3)
+        oldAbsoluteState1=flatten(oldAbsoluteState1)
+        p4=np.dot(np.array(list(zip(p3))),np.transpose(np.array(list(zip(oldAbsoluteState1)))))
+        #p4=np.matmul(np.array(list(zip(p3))),np.transpose(np.array(list(zip(oldAbsoluteState1)))))
         gradient_mean_board=p4
         ##
         ##
@@ -965,7 +985,17 @@ class agentOne():
         p2=[stepSizeMessage-x for x in mean_message]
         p3=np.multiply(p1,p2)
         self.msg_policy_biases=self.msg_policy_biases+[stepSizeMessage*x for x in p3]
-        p4=np.matmul(np.array(list(zip(p3))),np.transpose(np.array(list(zip(oldAbsoluteState1)))))
+        #
+        #
+        #
+        #THERE WAS A CHANGE HERE
+        #
+        #
+        #
+        p3=flatten(p3)
+        oldAbsoluteState1=flatten(oldAbsoluteState1)
+        p4=np.dot(np.array(list(zip(p3))),np.transpose(np.array(list(zip(oldAbsoluteState1)))))
+        #p4=np.matmul(np.array(list(zip(p3))),np.transpose(np.array(list(zip(oldAbsoluteState1)))))
         gradient_mean_message=p4
         ##
         ##
@@ -974,7 +1004,17 @@ class agentOne():
         p3=np.multiply(p1,p2)
         p4=[x-1 for x in p3]
         self.msg_policy_std_biases=self.msg_policy_std_biases+[stepSizeMessage*x for x in p4]
-        p5=np.matmul(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState1)))))
+        #
+        #
+        #
+        #THERE WAS A CHANGE HERE
+        #
+        #
+        #
+        p4=flatten(p4)
+        oldAbsoluteState1=flatten(oldAbsoluteState1)
+        p5=np.dot(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState1)))))
+        #p5=np.matmul(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState1)))))
         gradient_std_message=p5
         ##
         self.msg_policy_params=self.msg_policy_params+np.multiply((stepSizeMessage*self.I*valueError),gradient_mean_message)
