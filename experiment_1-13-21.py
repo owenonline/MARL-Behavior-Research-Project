@@ -45,45 +45,53 @@ class checkersEnvironment():
         self.fullState=(reward,boardState,isTerminal,messages,relationVals)
         return self.fullState
             
-    def envStepBoard(self,action,piece,agentReal):
+    def envStepBoard(self,boardAction):
+        agentReal=boardAction[0]
+        piece=int(boardAction[1])
+        action=boardAction[2:]
+        agent=int(abs(agentReal)-1)
         #agentReal=-1, -2, 1, or 2 to represent either agent 1, agent 2, or either agent but selected by agent 3 (the negative values). This is normalized to a binary value for the purpose of determining move legality.
-        agent=abs(agentReal)-1
         #agent: either 0 or 1 to represent agents 1 or 2
         #piece: any integer 0-5 to allow choice of any piece
         #action: [(-2-2), (-2-2), (-2-2), (-2-2), (-2-2), (-2-2)] with those being the movement increments. Any single move in checkers is either 0, 1, or 2 spaces in length hence the (-2-2). a negative value moves left diagonal
-        lastState=self.fullState[1] #this gets the state from the tuple
-        pieceStart=lastState[agent][piece] #this gets the situation of the piece the agent chose to move as of the last state.  [row,column]          
+        #this gets the state from the tuple
+        lastState=self.fullState[1] 
 
-        currentState=lastState
+        currentState=lastState#sets the current state to the most updated state before the loop
         boardReward=0
         generalReward=0
         isTerminal=False
-
+        
         for x in range(len(action)):
+            pieceStart=currentState[int(agent)][int(piece)] #this gets the situation of the piece at the start of the loop  
+            currentAction=int(action[0][x])
+
             if pieceStart==[0,0]:
                 #this means an already eliminated piece has been selected
-                boaordReward+=-10
+                boardReward+=-10
                 break
             
             #checks if the move was legal
-            if action[x]==0:
+            if currentAction==0:
                 if x==0:
-                    #not moving any piece is an illegal move
+                    #not moving any piece on the first move of the turn is illegal
                     boardReward+=-10
-                    break
-
+                #a move of 0 always ends the turn
+                break
+                
+            
             #checks that the new index is within the board and is unoccupied by either an opposing or friendly piece
-            elif 1<=pieceStart[0]+abs(action[x])<6 and 1<pieceStart[1]+action[x]<=6 and [pieceStart[0]+abs(action[x]),pieceStart[1]+action[x]] not in lasteState[0] and [pieceStart[0]+abs(action[x]),pieceStart[1]+action[x]] not in lastState[1]:
+            elif 1<=pieceStart[0]+abs(currentAction)<6 and 1<pieceStart[1]+currentAction<=6 and [pieceStart[0]+abs(currentAction),pieceStart[1]+currentAction] not in currentState[0] and [pieceStart[0]+abs(currentAction),pieceStart[1]+currentAction] not in currentState[1]:
                 #if no move to capture was made and the previous check was passed, the move is legal and the current state can be updated to reflect that.
-                if action[x]==1 or action[x]==-1:
-                    currentState[agent][piece]=[pieceStart[0]+abs(action[x]),pieceStart[1]+action[x]]
+                if currentAction==1 or currentAction==-1:
+                    currentState[agent][piece]=[pieceStart[0]+abs(currentAction),pieceStart[1]+currentAction]
                     break
-                elif action[x]==2 or action[x]==-2:
+                elif currentAction==2 or currentAction==-2:
                     #this just checks if the jumped over square contains an enemy piece. this must be true for the move to be legal
-                    if [pieceStart[0]+abs(action[x])-1,pieceStart[1]+((abs(action[x])-1)*(action[x]/abs(action[x])))] in lastState[-1*agent+1]:
-                        currentState[agent][piece]=[pieceStart[0]+abs(action[x]),pieceStart[1]+action[x]]
+                    if [pieceStart[0]+abs(currentAction)-1,pieceStart[1]+((abs(currentAction)-1)*(currentAction/abs(currentAction)))] in lastState[-1*agent+1]:
+                        currentState[agent][piece]=[pieceStart[0]+abs(currentAction),pieceStart[1]+currentAction]
                         #sets the state of the enemy piece that was taken to 0
-                        currentState[-1*agent+1][lastState[-1*agent+1].index([pieceStart[0]+abs(action[x])-1,pieceStart[1]+((abs(action[x])-1)*(action[x]/abs(action[x])))])]=[0,0]
+                        currentState[-1*agent+1][lastState[-1*agent+1].index([pieceStart[0]+abs(currentAction)-1,pieceStart[1]+((abs(currentAction)-1)*(currentAction/abs(currentAction)))])]=[0,0]
                         #sets piecestart for the starting position of the next part of the move
                         pieceStart=currentState[agent][piece]
                     else:
@@ -114,12 +122,18 @@ class checkersEnvironment():
             isTerminal=True
         elif (agentReal==-1 or agentReal==-2) and not (currentState[0]==self.terminal or currentState[1]==self.terminal):
             #agent 3 gets a +1 general reward every time step
-            reward=1
+            generalReward=1
         elif (agentReal==1 or agentReal==2) and not (currentState[0]==self.terminal or currentState[1]==self.terminal):
             #agents 1 and 2 get a -1 general reward every time step
-            reward=-1
+            generalReward=-1
 
         return (currentState, isTerminal, boardReward, generalReward)
+
+    def envStepMessage(self,messageAction,boardAction):
+        print("Not yet implemented")
+
+    def prepNewState(self,messageAction,currentState,absoluteState1,absoluteState2,absoluteState3):
+        print("Not yet implemented")
 
 
 class agentThree():
@@ -142,14 +156,14 @@ class agentThree():
         self.value_fn_params=[]
         
         self.board_policy_params=[np.random.normal(0,0.1,(318,363)),np.random.normal(0,0.1,(273,318)),np.random.normal(0,0.1,(228,273)),np.random.normal(0,0.1,(183,228)),np.random.normal(0,0.1,(138,183)),np.random.normal(0,0.1,(93,138)),np.random.normal(0,0.1,(48,93)),np.random.normal(0,0.1,(8,48))]
-        self.board_policy_biases=[0,0,0,0,0,0,0,0,0]
+        self.board_policy_biases=[0,0,0,0,0,0,0,0]
         self.board_policy_backprop_info=[]
         
         self.msg_policy_params=[np.random.normal(0,0.1,(343,363)),np.random.normal(0,0.1,(323,343)),np.random.normal(0,0.1,(303,323)),np.random.normal(0,0.1,(283,303)),np.random.normal(0,0.1,(243,283)),np.random.normal(0,0.1,(223,243)),np.random.normal(0,0.1,(203,223)),np.random.normal(0,0.1,(200,203))]
-        self.msg_policy_biases=[0,0,0,0,0,0,0,0,0]
+        self.msg_policy_biases=[0,0,0,0,0,0,0,0]
         self.msg_policy_backprop_info=[]
         
-    def stateConcatThree(fullState):
+    def stateConcatThree(self, fullState):
         reward=fullState[0]
         boardState=fullState[1]
         temp=[]
@@ -164,7 +178,7 @@ class agentThree():
         messageThree=fullState[3][2]
         messageFour=fullState[3][3]
         relationVals=fullState[4]
-        lstm_inputs=[messageOne,messageTwo,messageThree,boardState,relationVals]
+        lstm_inputs=[messageOne,messageTwo,messageThree,messageFour,boardState,relationVals]
 
         for x in range(len(lstm_inputs)):
             concat_input=np.concatenate((lstm_inputs[x],self.lstm_recursive_info[x][1]))
@@ -196,14 +210,14 @@ class agentThree():
 
     def boardAction(self):
         #363->318->273->228->183->138->93->48->8
-        nn1=swish(np.matmul((self.board_policy_params[0],self.ffn_outputs[1])))
-        nn2=swish(np.matmul((self.board_policy_params[1],nn1)))
-        nn3=swish(np.matmul((self.board_policy_params[2],nn2)))
-        nn4=swish(np.matmul((self.board_policy_params[3],nn3)))
-        nn5=swish(np.matmul((self.board_policy_params[4],nn4)))
-        nn6=swish(np.matmul((self.board_policy_params[5],nn5)))
-        nn7=swish(np.matmul((self.board_policy_params[6],nn6)))
-        nn8=swish(np.matmul((self.board_policy_params[7],nn7)))
+        nn1=swish(np.matmul(self.board_policy_params[0],self.ffn_outputs[1])+self.board_policy_biases[0])
+        nn2=swish(np.matmul(self.board_policy_params[1],nn1)+self.board_policy_biases[1])
+        nn3=swish(np.matmul(self.board_policy_params[2],nn2)+self.board_policy_biases[2])
+        nn4=swish(np.matmul(self.board_policy_params[3],nn3)+self.board_policy_biases[3])
+        nn5=swish(np.matmul(self.board_policy_params[4],nn4)+self.board_policy_biases[4])
+        nn6=swish(np.matmul(self.board_policy_params[5],nn5)+self.board_policy_biases[5])
+        nn7=swish(np.matmul(self.board_policy_params[6],nn6)+self.board_policy_biases[6])
+        nn8=swish(np.matmul(self.board_policy_params[7],nn7)+self.board_policy_biases[7])
         orig_nn8=nn8
         if nn8[0]>-1.5:
             nn8[0]=-1
@@ -218,17 +232,18 @@ class agentThree():
 
     def messageAction(self):
         #363->343->323->303->283->243->223->203->200
-        nn1=swish(np.matmul((self.msg_policy_params[0],self.ffn_outputs[1])))
-        nn2=swish(np.matmul((self.msg_policy_params[1],nn1)))
-        nn3=swish(np.matmul((self.msg_policy_params[2],nn2)))
-        nn4=swish(np.matmul((self.msg_policy_params[3],nn3)))
-        nn5=swish(np.matmul((self.msg_policy_params[4],nn4)))
-        nn6=swish(np.matmul((self.msg_policy_params[5],nn5)))
-        nn7=swish(np.matmul((self.msg_policy_params[6],nn6)))
-        nn8=swish(np.matmul((self.msg_policy_params[7],nn7)))
+        nn1=swish(np.matmul(self.msg_policy_params[0],self.ffn_outputs[1])+self.msg_policy_biases[0])
+        nn2=swish(np.matmul(self.msg_policy_params[1],nn1)+self.msg_policy_biases[1])
+        nn3=swish(np.matmul(self.msg_policy_params[2],nn2)+self.msg_policy_biases[2])
+        nn4=swish(np.matmul(self.msg_policy_params[3],nn3)+self.msg_policy_biases[3])
+        nn5=swish(np.matmul(self.msg_policy_params[4],nn4)+self.msg_policy_biases[4])
+        nn6=swish(np.matmul(self.msg_policy_params[5],nn5)+self.msg_policy_biases[5])
+        nn7=swish(np.matmul(self.msg_policy_params[6],nn6)+self.msg_policy_biases[6])
+        nn8=swish(np.matmul(self.msg_policy_params[7],nn7)+self.msg_policy_biases[7])
         message1=nn8[0:99]
         message2=nn8[100:199]
         messageAction=[message1,message2]
+        self.msg_policy_backprop_info=[nn1,nn2,nn3,nn4,nn5,nn6,nn7,nn8]
         return messageAction
         
         
@@ -250,11 +265,16 @@ class agentTwo():
         self.ffn_outputs=[[],[]]
         
         self.value_fn_params=[]
-        self.board_policy_params=[]
-        self.msg_policy_params=[]
 
+        self.board_policy_params=[np.random.normal(0,0.1,(176,200)),np.random.normal(0,0.1,(152,176)),np.random.normal(0,0.1,(128,152)),np.random.normal(0,0.1,(104,128)),np.random.normal(0,0.1,(80,104)),np.random.normal(0,0.1,(56,80)),np.random.normal(0,0.1,(32,56)),np.random.normal(0,0.1,(7,32))]
+        self.board_policy_biases=[0,0,0,0,0,0,0,0]
+        self.board_policy_backprop_info=[]
         
-    def stateConcatTwo(fullState):
+        self.msg_policy_params=[np.random.normal(0,0.1,(190,200)),np.random.normal(0,0.1,(180,190)),np.random.normal(0,0.1,(170,180)),np.random.normal(0,0.1,(160,170)),np.random.normal(0,0.1,(150,160)),np.random.normal(0,0.1,(140,150)),np.random.normal(0,0.1,(130,140)),np.random.normal(0,0.1,(120,130)),np.random.normal(0,0.1,(110,120)),np.random.normal(0,0.1,(100,110))]
+        self.msg_policy_biases=[0,0,0,0,0,0,0,0,0,0]
+        self.msg_policy_backprop_info=[]
+        
+    def stateConcatTwo(self, fullState):
         reward=fullState[0]
         boardState=fullState[1]
         temp=[]
@@ -266,7 +286,7 @@ class agentTwo():
         isTerminal=fullState[2]
         messageTwo=fullState[3][1]
         messageFour=fullState[3][3]
-        relationVal=fullState[4][1]
+        relationVal=[fullState[4][1]]
         lstm_inputs=[messageTwo,messageFour,boardState,relationVal]
 
         for x in range(len(lstm_inputs)):
@@ -297,6 +317,41 @@ class agentTwo():
         #ffn_2 is the networks perception of the state distilled from memory and feed forward layers
         return self.ffn_outputs[1]
 
+    def boardAction(self):
+        #200->176->152->128->104->80->56->32->7
+        nn1=swish(np.matmul(self.board_policy_params[0],self.ffn_outputs[1])+self.board_policy_biases[0])
+        nn2=swish(np.matmul(self.board_policy_params[1],nn1)+self.board_policy_biases[1])
+        nn3=swish(np.matmul(self.board_policy_params[2],nn2)+self.board_policy_biases[2])
+        nn4=swish(np.matmul(self.board_policy_params[3],nn3)+self.board_policy_biases[3])
+        nn5=swish(np.matmul(self.board_policy_params[4],nn4)+self.board_policy_biases[4])
+        nn6=swish(np.matmul(self.board_policy_params[5],nn5)+self.board_policy_biases[5])
+        nn7=swish(np.matmul(self.board_policy_params[6],nn6)+self.board_policy_biases[6])
+        nn8=swish(np.matmul(self.board_policy_params[7],nn7)+self.board_policy_biases[7])
+        nn8=np.concatenate([2],nn8)
+        nn8[1]=np.round((5/(1+np.exp(-nn8[1]-5))))
+        for x in range(len(nn8[2:])):
+            nn8[x+2]=np.round((4/(1+np.exp(-(nn8[1]-4))))-2)
+        boardAction=[nn8[0],nn8[1],nn8[2:]]
+        self.board_policy_backprop_info=[nn1,nn2,nn3,nn4,nn5,nn6,nn7,orig_nn8]
+        return boardAction
+        
+    def messageAction(self):
+        #200->190->180->170->160->150->140->130->120->110->100
+        nn1=swish(np.matmul(self.msg_policy_params[0],self.ffn_outputs[1])+self.msg_policy_biases[0])
+        nn2=swish(np.matmul(self.msg_policy_params[1],nn1)+self.msg_policy_biases[1])
+        nn3=swish(np.matmul(self.msg_policy_params[2],nn2)+self.msg_policy_biases[2])
+        nn4=swish(np.matmul(self.msg_policy_params[3],nn3)+self.msg_policy_biases[3])
+        nn5=swish(np.matmul(self.msg_policy_params[4],nn4)+self.msg_policy_biases[4])
+        nn6=swish(np.matmul(self.msg_policy_params[5],nn5)+self.msg_policy_biases[5])
+        nn7=swish(np.matmul(self.msg_policy_params[6],nn6)+self.msg_policy_biases[6])
+        nn8=swish(np.matmul(self.msg_policy_params[7],nn7)+self.msg_policy_biases[7])
+        nn9=swish(np.matmul(self.msg_policy_params[8],nn8)+self.msg_policy_biases[8])
+        nn10=swish(np.matmul(self.msg_policy_params[9],nn9)+self.msg_policy_biases[9])
+        message4=nn10
+        messageAction=[message4]
+        self.msg_policy_backprop_info=[nn1,nn2,nn3,nn4,nn5,nn6,nn7,nn8,nn9,nn10]
+        return messageAction
+        
             
 class agentOne():
     def __init__(self):
@@ -316,11 +371,17 @@ class agentOne():
         self.ffn_outputs=[[],[]]
         
         self.value_fn_params=[]
-        self.board_policy_params=[]
-        self.msg_policy_params=[]
+        
+        self.board_policy_params=[np.random.normal(0,0.1,(176,200)),np.random.normal(0,0.1,(152,176)),np.random.normal(0,0.1,(128,152)),np.random.normal(0,0.1,(104,128)),np.random.normal(0,0.1,(80,104)),np.random.normal(0,0.1,(56,80)),np.random.normal(0,0.1,(32,56)),np.random.normal(0,0.1,(7,32))]
+        self.board_policy_biases=[0,0,0,0,0,0,0,0]
+        self.board_policy_backprop_info=[]
+        
+        self.msg_policy_params=[np.random.normal(0,0.1,(190,200)),np.random.normal(0,0.1,(180,190)),np.random.normal(0,0.1,(170,180)),np.random.normal(0,0.1,(160,170)),np.random.normal(0,0.1,(150,160)),np.random.normal(0,0.1,(140,150)),np.random.normal(0,0.1,(130,140)),np.random.normal(0,0.1,(120,130)),np.random.normal(0,0.1,(110,120)),np.random.normal(0,0.1,(100,110))]
+        self.msg_policy_biases=[0,0,0,0,0,0,0,0,0,0]
+        self.msg_policy_backprop_info=[]
 
         
-    def stateConcatOne(fullState):
+    def stateConcatOne(self, fullState):
         reward=fullState[0]
         boardState=fullState[1]
         temp=[]
@@ -332,7 +393,7 @@ class agentOne():
         isTerminal=fullState[2]
         messageOne=fullState[3][0]
         messageThree=fullState[3][2]
-        relationVal=fullState[4][0]
+        relationVal=[fullState[4][0]]
         lstm_inputs=[messageOne,messageThree,boardState,relationVal]
 
         for x in range(len(lstm_inputs)):
@@ -363,24 +424,58 @@ class agentOne():
         #ffn_2 is the networks perception of the state distilled from memory and feed forward layers
         return self.ffn_outputs[1]
 
+    def boardAction(self):
+        #200->176->152->128->104->80->56->32->7
+        nn1=swish(np.matmul(self.board_policy_params[0],self.ffn_outputs[1])+self.board_policy_biases[0])
+        nn2=swish(np.matmul(self.board_policy_params[1],nn1)+self.board_policy_biases[1])
+        nn3=swish(np.matmul(self.board_policy_params[2],nn2)+self.board_policy_biases[2])
+        nn4=swish(np.matmul(self.board_policy_params[3],nn3)+self.board_policy_biases[3])
+        nn5=swish(np.matmul(self.board_policy_params[4],nn4)+self.board_policy_biases[4])
+        nn6=swish(np.matmul(self.board_policy_params[5],nn5)+self.board_policy_biases[5])
+        nn7=swish(np.matmul(self.board_policy_params[6],nn6)+self.board_policy_biases[6])
+        nn8=swish(np.matmul(self.board_policy_params[7],nn7)+self.board_policy_biases[7])
+        nn8=np.concatenate([1],nn8)
+        nn8[1]=np.round((5/(1+np.exp(-nn8[1]-5))))
+        for x in range(len(nn8[2:])):
+            nn8[x+2]=np.round((4/(1+np.exp(-(nn8[1]-4))))-2)
+        boardAction=[nn8[0],nn8[1],nn8[2:]]
+        self.board_policy_backprop_info=[nn1,nn2,nn3,nn4,nn5,nn6,nn7,orig_nn8]
+        return boardAction
+        
+    def messageAction(self):
+        #200->190->180->170->160->150->140->130->120->110->100
+        nn1=swish(np.matmul(self.msg_policy_params[0],self.ffn_outputs[1])+self.msg_policy_biases[0])
+        nn2=swish(np.matmul(self.msg_policy_params[1],nn1)+self.msg_policy_biases[1])
+        nn3=swish(np.matmul(self.msg_policy_params[2],nn2)+self.msg_policy_biases[2])
+        nn4=swish(np.matmul(self.msg_policy_params[3],nn3)+self.msg_policy_biases[3])
+        nn5=swish(np.matmul(self.msg_policy_params[4],nn4)+self.msg_policy_biases[4])
+        nn6=swish(np.matmul(self.msg_policy_params[5],nn5)+self.msg_policy_biases[5])
+        nn7=swish(np.matmul(self.msg_policy_params[6],nn6)+self.msg_policy_biases[6])
+        nn8=swish(np.matmul(self.msg_policy_params[7],nn7)+self.msg_policy_biases[7])
+        nn9=swish(np.matmul(self.msg_policy_params[8],nn8)+self.msg_policy_biases[8])
+        nn10=swish(np.matmul(self.msg_policy_params[9],nn9)+self.msg_policy_biases[9])
+        message3=nn10
+        messageAction=[message3]
+        self.msg_policy_backprop_info=[nn1,nn2,nn3,nn4,nn5,nn6,nn7,nn8,nn9,nn10]
+        return messageAction
 
-def main():
-    checkers=checkersEnvironment()
-    agentOne=agentOne()
-    agentTwo=agentTwo()
-    agentThree=agentThree()
-    
-    checkers.envInit()
-    fullState=checkers.envStart()
-    
-    absoluteState3=agentThree.stateConcatThree(fullState)
-    absoluteState2=agentTwo.stateConcatTwo(fullState)
-    absoluteState1=agentOne.stateConcatOne(fullState)
+#main program
+checkers=checkersEnvironment()
+agentOne=agentOne()
+agentTwo=agentTwo()
+agentThree=agentThree()
 
-    boardAction=agentThree.boardAction()
-    messageAction=agentThree.messageAction()
+checkers.envInit()
+fullState=checkers.envStart()
 
-main()
+absoluteState3=agentThree.stateConcatThree(fullState)
+absoluteState2=agentTwo.stateConcatTwo(fullState)
+absoluteState1=agentOne.stateConcatOne(fullState)
+
+boardAction=agentThree.boardAction()
+messageAction=agentThree.messageAction()
+
+(currentState, isTerminal, boardReward, generalReward)=checkers.envStepBoard(boardAction)
     
 
 
