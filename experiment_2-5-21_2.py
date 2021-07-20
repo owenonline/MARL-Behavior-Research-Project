@@ -176,6 +176,9 @@ class checkersEnvironment():
         oldAbsoluteState3=absoluteState3
         return (oldAbsoluteState1,oldAbsoluteState2,oldAbsoluteState3, self.fullState)
 
+    def updateState(self, relationValues):
+        self.fullState[-1]=relationValues
+
 
 class agentThree():
     def __init__(self):
@@ -227,10 +230,7 @@ class agentThree():
         messageThree=fullState[3][2]
         messageFour=fullState[3][3]
         relationVals=fullState[4]
-        print("x")
-        #error here on second run
         self.external_message_history.append(np.concatenate((messageThree,messageFour)))
-        print("y")
         lstm_inputs=[messageOne,messageTwo,messageThree,messageFour,boardState,relationVals]
         
         for x in range(len(lstm_inputs)):
@@ -295,8 +295,8 @@ class agentThree():
         nn6=swish(np.matmul(self.msg_policy_params[5],nn5)+self.msg_policy_biases[5])
         nn7=swish(np.matmul(self.msg_policy_params[6],nn6)+self.msg_policy_biases[6])
         nn8=swish(np.matmul(self.msg_policy_params[7],nn7)+self.msg_policy_biases[7])
-        message1=nn8[0:99]
-        message2=nn8[100:199]
+        message1=nn8[0:100]
+        message2=nn8[100:200]
         messageAction=[message1,message2]
         self.msg_policy_backprop_info=[nn1,nn2,nn3,nn4,nn5,nn6,nn7,nn8]
         self.message_history_self.append(nn8)
@@ -422,7 +422,7 @@ class agentTwo():
         return messageAction
     
     def stateValue(self, absoluteState2):
-        currentStateValue1=np.matmul(self.value_fn_params,absoluteState2)
+        currentStateValue2=np.matmul(self.value_fn_params,absoluteState2)
         return currentStateValue2
         
             
@@ -558,7 +558,7 @@ agentThree=agentThree()
 checkers.envInit()
 fullState=checkers.envStart()
 
-###AGENT ONE ROUND###
+###AGENT THREE ROUND###
 #set new states
 absoluteState3=agentThree.stateConcatThree(fullState)
 absoluteState2=agentTwo.stateConcatTwo(fullState)
@@ -571,9 +571,9 @@ messageAction=agentThree.messageAction()
 (currentState, isTerminal, boardReward, generalReward)=checkers.envStepBoard(boardAction)
 (totalSpeakingReward, totalListeningReward)=checkers.envStepMessage(agentThree.absolute_state_history,agentThree.message_history_self,agentThree.action_history_self,agentThree.external_message_history)
 reward=[boardReward,generalReward,totalSpeakingReward,totalListeningReward]
-#the one is a hacky solution for knowing what messages to replace. in this case it says that it's agent 1's turn to act
+#the one is a hacky solution for knowing what messages to replace. in this case it says that it's agent 3's turn to act
 #get new states
-(oldAbsoluteState1,oldAbsoluteState2,oldAbsoluteState3, fullState)=checkers.prepNewState(messageAction,isTerminal,reward,currentState,absoluteState1,absoluteState2,absoluteState3,1)
+(oldAbsoluteState1,oldAbsoluteState2,oldAbsoluteState3, fullState)=checkers.prepNewState(messageAction,isTerminal,reward,currentState,absoluteState1,absoluteState2,absoluteState3,3)
 absoluteState3=agentThree.stateConcatThree(fullState)
 absoluteState2=agentTwo.stateConcatTwo(fullState)
 absoluteState1=agentOne.stateConcatOne(fullState)
@@ -584,3 +584,28 @@ currentStateValue2=agentTwo.stateValue(absoluteState2)
 oldStateValue1=agentOne.stateValue(oldAbsoluteState1)
 oldStateValue2=agentTwo.stateValue(oldAbsoluteState2)
 #now im at the point where I can finally write the most difficult method of the whole program
+
+###AGENT ONE ROUND###
+checkers.updateState(relationVals)
+absoluteState3=agentThree.stateConcatThree(fullState)
+absoluteState2=agentTwo.stateConcatTwo(fullState)
+absoluteState1=agentOne.stateConcatOne(fullState)
+boardAction=agentOne.boardAction()
+messageAction=agentOne.messageAction()
+(currentState, isTerminal, boardReward, generalReward)=checkers.envStepBoard(boardAction)
+(totalSpeakingReward, totalListeningReward)=checkers.envStepMessage(agentOne.absolute_state_history,agentOne.message_history_self,agentOne.action_history_self,agentOne.external_message_history)
+reward=[boardReward,generalReward,totalSpeakingReward,totalListeningReward]
+(oldAbsoluteState1,oldAbsoluteState2,oldAbsoluteState3, fullState)=checkers.prepNewState(messageAction,isTerminal,reward,currentState,absoluteState1,absoluteState2,absoluteState3,1)
+#update method
+
+###AGENT TWO ROUND###
+absoluteState3=agentThree.stateConcatThree(fullState)
+absoluteState2=agentTwo.stateConcatTwo(fullState)
+absoluteState1=agentOne.stateConcatOne(fullState)
+boardAction=agentOne.boardAction()
+messageAction=agentOne.messageAction()
+(currentState, isTerminal, boardReward, generalReward)=checkers.envStepBoard(boardAction)
+(totalSpeakingReward, totalListeningReward)=checkers.envStepMessage(agentTwo.absolute_state_history,agentTwo.message_history_self,agentTwo.action_history_self,agentTwo.external_message_history)
+reward=[boardReward,generalReward,totalSpeakingReward,totalListeningReward]
+(oldAbsoluteState1,oldAbsoluteState2,oldAbsoluteState3, fullState)=checkers.prepNewState(messageAction,isTerminal,reward,currentState,absoluteState1,absoluteState2,absoluteState3,1)
+#update method
