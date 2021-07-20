@@ -209,7 +209,7 @@ class agentThree():
         self.lstm_params=[[np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400))],[np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400))],[np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400))],[np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400))],[np.random.normal(0,0.1,(200,224)),np.random.normal(0,0.1,(200,224)),np.random.normal(0,0.1,(200,224)),np.random.normal(0,0.1,(200,224))],[np.random.normal(0,0.1,(50,52)),np.random.normal(0,0.1,(50,52)),np.random.normal(0,0.1,(50,52)),np.random.normal(0,0.1,(50,52))]]
         self.lstm_backprop_state=[[[],[],[],[]],[[],[],[],[]],[[],[],[],[]],[[],[],[],[]],[[],[],[],[]],[[],[],[],[]]]
         self.lstm_recursive_info=[[[np.ones(300)],[np.ones(300)]],[[np.ones(300)],[np.ones(300)]],[[np.ones(300)],[np.ones(300)]],[[np.ones(300)],[np.ones(300)]],[[np.ones(200)],[np.ones(200)]],[[np.ones(50)],[np.ones(50)]]]
-        self.lstm_biases=[[np.ones(300),np.ones(300),np.ones(300),np.ones(300)],[np.ones(300),np.ones(300),np.ones(300),np.ones(300)],[np.ones(300),np.ones(300),np.ones(300),np.ones(300)],[np.ones(300),np.ones(300),np.ones(300),np.ones(300)],[np.ones(200),np.ones(200),np.ones(200),np.ones(200)],[np.ones(50),np.ones(50),np.ones(50),np.ones(50)]]
+        self.lstm_biases=[[np.zeros(300),np.zeros(300),np.zeros(300),np.zeros(300)],[np.zeros(300),np.zeros(300),np.zeros(300),np.zeros(300)],[np.zeros(300),np.zeros(300),np.zeros(300),np.zeros(300)],[np.zeros(300),np.zeros(300),np.zeros(300),np.zeros(300)],[np.zeros(200),np.zeros(200),np.zeros(200),np.zeros(200)],[np.zeros(50),np.zeros(50),np.zeros(50),np.zeros(50)]]
                 
         #ffn is gonna have 2 layers each with relu that cut the length down. 1450->725->363
         self.ffn_params=[np.random.normal(0,0.1,(725,1450)),np.random.normal(0,0.1,(363,725))]
@@ -225,8 +225,8 @@ class agentThree():
         self.board_policy_std_biases=np.zeros(8)
         self.board_policy_backprop_info=[np.zeros(8)]
         
-        self.msg_policy_params=np.random.normal(0,0.1,(200,363))
-        self.msg_policy_std_params=np.random.normal(0,0.1,(200,363))
+        self.msg_policy_params=np.random.normal(0,0.01,(200,363))
+        self.msg_policy_std_params=np.random.normal(0,0.01,(200,363))
         self.msg_policy_biases=np.zeros(200)
         self.msg_policy_std_biases=np.zeros(200)
         self.msg_policy_backprop_info=[np.zeros(200)]
@@ -372,7 +372,7 @@ class agentThree():
         self.value_fn_params=self.value_fn_params+stepSizeValue*valueError*value_derivative*oldAbsoluteState3
         
         ####This code calculates the new values for the board policy####
-        stepSizeBoard=0.1
+        stepSizeBoard=0.01
         standard_deviation_board=[math.exp(y) for y in np.matmul(self.board_policy_std_params,oldAbsoluteState3)]
         mean_board=self.board_policy_backprop_info[-2]
         ##
@@ -396,8 +396,9 @@ class agentThree():
         self.board_policy_std_params=self.board_policy_std_params+np.multiply((stepSizeBoard*self.I*valueError),gradient_std_board)
         
         ####This code calculates the new values for the message policy####
-        stepSizeMessage=0.1
+        stepSizeMessage=0.01
         standard_deviation_message=[math.exp(y) for y in np.matmul(self.msg_policy_std_params,oldAbsoluteState3)]
+        print(standard_deviation_message)
         mean_message=self.msg_policy_backprop_info[-2]
         ##
         p1=[1/x**2 for x in standard_deviation_message]
@@ -783,7 +784,7 @@ class agentOne():
         self.lstm_params=[[np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400))],[np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400))],[np.random.normal(0,0.1,(200,224)),np.random.normal(0,0.1,(200,224)),np.random.normal(0,0.1,(200,224)),np.random.normal(0,0.1,(200,224))],[np.random.normal(0,0.1,(50,51)),np.random.normal(0,0.1,(50,51)),np.random.normal(0,0.1,(50,51)),np.random.normal(0,0.1,(50,51))]]
         self.lstm_backprop_state=[[[],[],[],[]],[[],[],[],[]],[[],[],[],[]],[[],[],[],[]]]
         self.lstm_recursive_info=[[[np.ones(300)],[np.ones(300)]],[[np.ones(300)],[np.ones(300)]],[[np.ones(200)],[np.ones(200)]],[[np.ones(50)],[np.ones(50)]]]
-        self.lstm_biases=[[np.ones(300),np.ones(300),np.ones(300),np.ones(300)],[np.ones(300),np.ones(300),np.ones(300),np.ones(300)],[np.ones(200),np.ones(200),np.ones(200),np.ones(200)],[np.ones(50),np.ones(50),np.ones(50),np.ones(50)]]
+        self.lstm_biases=[[np.zeros(300),np.zeros(300),np.zeros(300),np.zeros(300)],[np.zeros(300),np.zeros(300),np.zeros(300),np.zeros(300)],[np.zeros(200),np.zeros(200),np.zeros(200),np.zeros(200)],[np.zeros(50),np.zeros(50),np.zeros(50),np.zeros(50)]]
 
         #ffn is gonna have 2 layers each with relu that cut the length down. 850->425->200
         self.ffn_params=[np.random.normal(0,0.1,(425,850)),np.random.normal(0,0.1,(200,425))]
@@ -941,6 +942,8 @@ class agentOne():
         p2=[stepSizeBoard-x for x in mean_board]
         p3=np.multiply(p1,p2)
         self.board_policy_biases=self.board_policy_biases+[stepSizeBoard*x for x in p3]
+        print(np.array(list(zip(p3))).shape)
+        print(np.transpose(np.array(list(zip(oldAbsoluteState1)))).shape)
         p4=np.matmul(np.array(list(zip(p3))),np.transpose(np.array(list(zip(oldAbsoluteState1)))))
         gradient_mean_board=p4
         ##
