@@ -206,21 +206,21 @@ class agentThree():
         #lstm backprop state has msg1-4 then board in the order fa, ia, ga, oa for back propogation
         #lstm recursive info has msg1-4 then board with the cell state then the last activation matrix
         #100 input length, 300 hidden length, so 400 total input length
-        self.lstm_params=[[np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400))],[np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400))],[np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400))],[np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400))],[np.random.normal(0,0.1,(200,224)),np.random.normal(0,0.1,(200,224)),np.random.normal(0,0.1,(200,224)),np.random.normal(0,0.1,(200,224))],[np.random.normal(0,0.1,(50,52)),np.random.normal(0,0.1,(50,52)),np.random.normal(0,0.1,(50,52)),np.random.normal(0,0.1,(50,52))]]
+        self.lstm_params=[[np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400))],[np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400))],[np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400))],[np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400))],[np.random.normal(0,0.01,(200,224)),np.random.normal(0,0.01,(200,224)),np.random.normal(0,0.01,(200,224)),np.random.normal(0,0.01,(200,224))],[np.random.normal(0,0.01,(50,52)),np.random.normal(0,0.01,(50,52)),np.random.normal(0,0.01,(50,52)),np.random.normal(0,0.01,(50,52))]]
         self.lstm_backprop_state=[[[],[],[],[]],[[],[],[],[]],[[],[],[],[]],[[],[],[],[]],[[],[],[],[]],[[],[],[],[]]]
         self.lstm_recursive_info=[[[np.ones(300)],[np.ones(300)]],[[np.ones(300)],[np.ones(300)]],[[np.ones(300)],[np.ones(300)]],[[np.ones(300)],[np.ones(300)]],[[np.ones(200)],[np.ones(200)]],[[np.ones(50)],[np.ones(50)]]]
         self.lstm_biases=[[np.zeros(300),np.zeros(300),np.zeros(300),np.zeros(300)],[np.zeros(300),np.zeros(300),np.zeros(300),np.zeros(300)],[np.zeros(300),np.zeros(300),np.zeros(300),np.zeros(300)],[np.zeros(300),np.zeros(300),np.zeros(300),np.zeros(300)],[np.zeros(200),np.zeros(200),np.zeros(200),np.zeros(200)],[np.zeros(50),np.zeros(50),np.zeros(50),np.zeros(50)]]
                 
         #ffn is gonna have 2 layers each with relu that cut the length down. 1450->725->363
-        self.ffn_params=[np.random.normal(0,0.1,(725,1450)),np.random.normal(0,0.1,(363,725))]
+        self.ffn_params=[np.random.normal(0,0.01,(725,1450)),np.random.normal(0,0.01,(363,725))]
         self.ffn_biases=[np.zeros(725),np.zeros(363)]
         self.ffn_outputs=[[],[]]
         
-        self.value_fn_params=np.random.normal(0,0.1,(1,363))
+        self.value_fn_params=np.random.normal(0,0.01,(1,363))
 
         #mean and standard deviation
-        self.board_policy_params=np.random.normal(0,0.1,(8,363))
-        self.board_policy_std_params=np.random.normal(0,0.1,(8,363))
+        self.board_policy_params=np.random.normal(0,0.01,(8,363))
+        self.board_policy_std_params=np.random.normal(0,0.01,(8,363))
         self.board_policy_biases=np.zeros(8)
         self.board_policy_std_biases=np.zeros(8)
         self.board_policy_backprop_info=[np.zeros(8)]
@@ -365,7 +365,7 @@ class agentThree():
         
         ####This code calculates the value function error, which is important in getting the error of the other states. It also updates the value function####
         valueDiscount=0.1
-        stepSizeValue=0.1
+        stepSizeValue=0.01
         #y'=y+sigmoid(x)*(1-y)...this is multiplied by the old state because to do the backprop thing u have to back propogate all the way from the value to the input
         value_derivative=oldStateValue3+sigmoid(np.matmul(self.value_fn_params,oldAbsoluteState3))*(1-oldStateValue3)
         valueError=totalRewardAvg+(0.1*currentStateValue3)-oldStateValue3
@@ -398,7 +398,6 @@ class agentThree():
         ####This code calculates the new values for the message policy####
         stepSizeMessage=0.01
         standard_deviation_message=[math.exp(y) for y in np.matmul(self.msg_policy_std_params,oldAbsoluteState3)]
-        print(standard_deviation_message)
         mean_message=self.msg_policy_backprop_info[-2]
         ##
         p1=[1/x**2 for x in standard_deviation_message]
@@ -423,7 +422,7 @@ class agentThree():
         self.I=self.I*valueDiscount
         ####This code does gradient passing back to the FFN's####
         #d=ffn learning rate
-        d=0.1
+        d=0.01
         valueError=valueError
         oldStateValue3=oldStateValue3
         ffn_out_one=self.absolute_state_history[-2][-1]#same as oldstate3
@@ -451,7 +450,7 @@ class agentThree():
 
         ####This code does gradient passing back to LSTM's####
         #r=lstm learning rate
-        r=0.1
+        r=0.01
         lstm_grads=[]
         lstm_grads.append(olderror3[0:300])
         lstm_grads.append(olderror3[300:600])
@@ -502,27 +501,27 @@ class agentTwo():
         #lstm backprop state has msg1-4 then board in the order fa, ia, ga, oa for back propogation
         #lstm recursive info has msg1-4 then board with the cell state then the last activation matrix
         #100 input length, 300 hidden length, so 400 total input length
-        self.lstm_params=[[np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400))],[np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400))],[np.random.normal(0,0.1,(200,224)),np.random.normal(0,0.1,(200,224)),np.random.normal(0,0.1,(200,224)),np.random.normal(0,0.1,(200,224))],[np.random.normal(0,0.1,(50,51)),np.random.normal(0,0.1,(50,51)),np.random.normal(0,0.1,(50,51)),np.random.normal(0,0.1,(50,51))]]
+        self.lstm_params=[[np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400))],[np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400))],[np.random.normal(0,0.01,(200,224)),np.random.normal(0,0.01,(200,224)),np.random.normal(0,0.01,(200,224)),np.random.normal(0,0.01,(200,224))],[np.random.normal(0,0.01,(50,51)),np.random.normal(0,0.01,(50,51)),np.random.normal(0,0.01,(50,51)),np.random.normal(0,0.01,(50,51))]]
         self.lstm_backprop_state=[[[],[],[],[]],[[],[],[],[]],[[],[],[],[]],[[],[],[],[]]]
         self.lstm_recursive_info=[[[np.ones(300)],[np.ones(300)]],[[np.ones(300)],[np.ones(300)]],[[np.ones(200)],[np.ones(200)]],[[np.ones(50)],[np.ones(50)]]]
-        self.lstm_biases=[[np.ones(300),np.ones(300),np.ones(300),np.ones(300)],[np.ones(300),np.ones(300),np.ones(300),np.ones(300)],[np.ones(200),np.ones(200),np.ones(200),np.ones(200)],[np.ones(50),np.ones(50),np.ones(50),np.ones(50)]]
+        self.lstm_biases=[[np.zeros(300),np.zeros(300),np.zeros(300),np.zeros(300)],[np.zeros(300),np.zeros(300),np.zeros(300),np.zeros(300)],[np.zeros(200),np.zeros(200),np.zeros(200),np.zeros(200)],[np.zeros(50),np.zeros(50),np.zeros(50),np.zeros(50)]]
 
         #ffn is gonna have 2 layers each with relu that cut the length down. 850->425->200
-        self.ffn_params=[np.random.normal(0,0.1,(425,850)),np.random.normal(0,0.1,(200,425))]
+        self.ffn_params=[np.random.normal(0,0.01,(425,850)),np.random.normal(0,0.01,(200,425))]
         self.ffn_biases=[np.zeros(425),np.zeros(200)]
         self.ffn_outputs=[[],[]]
 
         #im using linear value function approximation
-        self.value_fn_params=np.random.normal(0,0.1,(1,200))
+        self.value_fn_params=np.random.normal(0,0.01,(1,200))
 
-        self.board_policy_params=[np.random.normal(0,0.1,(7,200))]
-        self.board_policy_std_params=[np.random.normal(0,0.1,(7,200))]
+        self.board_policy_params=[np.random.normal(0,0.01,(7,200))]
+        self.board_policy_std_params=[np.random.normal(0,0.01,(7,200))]
         self.board_policy_biases=np.zeros(7)
         self.board_policy_std_biases=np.zeros(7)
         self.board_policy_backprop_info=[np.zeros(8)]
         
-        self.msg_policy_params=[np.random.normal(0,0.1,(100,200))]
-        self.msg_policy_std_params=[np.random.normal(0,0.1,(100,200))]
+        self.msg_policy_params=[np.random.normal(0,0.01,(100,200))]
+        self.msg_policy_std_params=[np.random.normal(0,0.01,(100,200))]
         self.msg_policy_biases=np.zeros(100)
         self.msg_policy_std_biases=np.zeros(100)
         self.msg_policy_backprop_info=[np.zeros(100)]
@@ -647,14 +646,14 @@ class agentTwo():
         
         ####This code calculates the value function error, which is important in getting the error of the other states. It also updates the value function####
         valueDiscount=0.1
-        stepSizeValue=0.1
+        stepSizeValue=0.01
         #y'=y+sigmoid(x)*(1-y)...this is multiplied by the old state because to do the backprop thing u have to back propogate all the way from the value to the input
         value_derivative=oldStateValue2+sigmoid(np.matmul(self.value_fn_params,oldAbsoluteState2))*(1-oldStateValue2)
         valueError=totalRewardAvg+(0.1*currentStateValue2)-oldStateValue2
         self.value_fn_params=self.value_fn_params+stepSizeValue*valueError*value_derivative*oldAbsoluteState2
         
         ####This code calculates the new values for the board policy####
-        stepSizeBoard=0.1
+        stepSizeBoard=0.01
         standard_deviation_board=[math.exp(y) for y in np.transpose(np.matmul(self.board_policy_std_params,oldAbsoluteState2))]
         mean_board=self.board_policy_backprop_info[-2][1:]
         ##
@@ -678,7 +677,7 @@ class agentTwo():
         self.board_policy_std_params=self.board_policy_std_params+np.multiply((stepSizeBoard*self.I*valueError),gradient_std_board)
         
         ####This code calculates the new values for the message policy####
-        stepSizeMessage=0.1
+        stepSizeMessage=0.01
         standard_deviation_message=[math.exp(y) for y in np.transpose(np.matmul(self.msg_policy_std_params,oldAbsoluteState2))]
         mean_message=self.msg_policy_backprop_info[-2]
         ##
@@ -704,7 +703,7 @@ class agentTwo():
         self.I=self.I*valueDiscount
         ####This code does gradient passing back to the FFN's####
         #d=ffn learning rate
-        d=0.1
+        d=0.01
         valueError=valueError
         oldStateValue3=oldStateValue2
         ffn_out_one=self.absolute_state_history[-2][-1]#same as oldstate3
@@ -732,7 +731,7 @@ class agentTwo():
 
         ####This code does gradient passing back to LSTM's####
         #r=lstm learning rate
-        r=0.1
+        r=0.01
         lstm_grads=[]
         lstm_grads.append(olderror3[0:300])
         lstm_grads.append(olderror3[300:600])
@@ -781,27 +780,27 @@ class agentOne():
         #lstm backprop state has msg1-4 then board in the order fa, ia, ga, oa for back propogation
         #lstm recursive info has msg1-4 then board with the cell state then the last activation matrix
         #100 input length, 300 hidden length, so 400 total input length
-        self.lstm_params=[[np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400))],[np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400)),np.random.normal(0,0.1,(300,400))],[np.random.normal(0,0.1,(200,224)),np.random.normal(0,0.1,(200,224)),np.random.normal(0,0.1,(200,224)),np.random.normal(0,0.1,(200,224))],[np.random.normal(0,0.1,(50,51)),np.random.normal(0,0.1,(50,51)),np.random.normal(0,0.1,(50,51)),np.random.normal(0,0.1,(50,51))]]
+        self.lstm_params=[[np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400))],[np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400)),np.random.normal(0,0.01,(300,400))],[np.random.normal(0,0.01,(200,224)),np.random.normal(0,0.01,(200,224)),np.random.normal(0,0.01,(200,224)),np.random.normal(0,0.01,(200,224))],[np.random.normal(0,0.01,(50,51)),np.random.normal(0,0.01,(50,51)),np.random.normal(0,0.01,(50,51)),np.random.normal(0,0.01,(50,51))]]
         self.lstm_backprop_state=[[[],[],[],[]],[[],[],[],[]],[[],[],[],[]],[[],[],[],[]]]
         self.lstm_recursive_info=[[[np.ones(300)],[np.ones(300)]],[[np.ones(300)],[np.ones(300)]],[[np.ones(200)],[np.ones(200)]],[[np.ones(50)],[np.ones(50)]]]
         self.lstm_biases=[[np.zeros(300),np.zeros(300),np.zeros(300),np.zeros(300)],[np.zeros(300),np.zeros(300),np.zeros(300),np.zeros(300)],[np.zeros(200),np.zeros(200),np.zeros(200),np.zeros(200)],[np.zeros(50),np.zeros(50),np.zeros(50),np.zeros(50)]]
 
         #ffn is gonna have 2 layers each with relu that cut the length down. 850->425->200
-        self.ffn_params=[np.random.normal(0,0.1,(425,850)),np.random.normal(0,0.1,(200,425))]
+        self.ffn_params=[np.random.normal(0,0.01,(425,850)),np.random.normal(0,0.01,(200,425))]
         self.ffn_biases=[np.zeros(425),np.zeros(200)]
         self.ffn_outputs=[[],[]]
         
         #im using linear value function approximation
-        self.value_fn_params=np.random.normal(0,0.1,(1,200))
+        self.value_fn_params=np.random.normal(0,0.01,(1,200))
         
-        self.board_policy_params=[np.random.normal(0,0.1,(7,200))]
-        self.board_policy_std_params=[np.random.normal(0,0.1,(7,200))]
+        self.board_policy_params=[np.random.normal(0,0.01,(7,200))]
+        self.board_policy_std_params=[np.random.normal(0,0.01,(7,200))]
         self.board_policy_biases=np.zeros(7)
         self.board_policy_std_biases=np.zeros(7)
         self.board_policy_backprop_info=[np.zeros(8)]
         
-        self.msg_policy_params=[np.random.normal(0,0.1,(100,200))]
-        self.msg_policy_std_params=[np.random.normal(0,0.1,(100,200))]
+        self.msg_policy_params=[np.random.normal(0,0.01,(100,200))]
+        self.msg_policy_std_params=[np.random.normal(0,0.01,(100,200))]
         self.msg_policy_biases=np.zeros(100)
         self.msg_policy_std_biases=np.zeros(100)
         self.msg_policy_backprop_info=[np.zeros(100)]
@@ -927,14 +926,14 @@ class agentOne():
         
         ####This code calculates the value function error, which is important in getting the error of the other states. It also updates the value function####
         valueDiscount=0.1
-        stepSizeValue=0.1
+        stepSizeValue=0.01
         #y'=y+sigmoid(x)*(1-y)...this is multiplied by the old state because to do the backprop thing u have to back propogate all the way from the value to the input
         value_derivative=oldStateValue1+sigmoid(np.matmul(self.value_fn_params,oldAbsoluteState1))*(1-oldStateValue1)
         valueError=totalRewardAvg+(0.1*currentStateValue1)-oldStateValue1
         self.value_fn_params=self.value_fn_params+stepSizeValue*valueError*value_derivative*oldAbsoluteState1
         
         ####This code calculates the new values for the board policy####
-        stepSizeBoard=0.1
+        stepSizeBoard=0.01
         standard_deviation_board=[math.exp(y) for y in np.transpose(np.matmul(self.board_policy_std_params,oldAbsoluteState1))]
         mean_board=self.board_policy_backprop_info[-2][1:]
         ##
@@ -942,8 +941,6 @@ class agentOne():
         p2=[stepSizeBoard-x for x in mean_board]
         p3=np.multiply(p1,p2)
         self.board_policy_biases=self.board_policy_biases+[stepSizeBoard*x for x in p3]
-        print(np.array(list(zip(p3))).shape)
-        print(np.transpose(np.array(list(zip(oldAbsoluteState1)))).shape)
         p4=np.matmul(np.array(list(zip(p3))),np.transpose(np.array(list(zip(oldAbsoluteState1)))))
         gradient_mean_board=p4
         ##
@@ -960,7 +957,7 @@ class agentOne():
         self.board_policy_std_params=self.board_policy_std_params+np.multiply((stepSizeBoard*self.I*valueError),gradient_std_board)
         
         ####This code calculates the new values for the message policy####
-        stepSizeMessage=0.1
+        stepSizeMessage=0.01
         standard_deviation_message=[math.exp(y) for y in np.transpose(np.matmul(self.msg_policy_std_params,oldAbsoluteState1))]
         mean_message=self.msg_policy_backprop_info[-2]
         ##
@@ -986,7 +983,7 @@ class agentOne():
         self.I=self.I*valueDiscount
         ####This code does gradient passing back to the FFN's####
         #d=ffn learning rate
-        d=0.1
+        d=0.01
         valueError=valueError
         oldStateValue1=oldStateValue1
         ffn_out_one=self.absolute_state_history[-2][-1]#same as oldstate3
@@ -1014,7 +1011,7 @@ class agentOne():
 
         ####This code does gradient passing back to LSTM's####
         #r=lstm learning rate
-        r=0.1
+        r=0.01
         lstm_grads=[]
         lstm_grads.append(olderror3[0:300])
         lstm_grads.append(olderror3[300:600])
