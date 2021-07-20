@@ -418,6 +418,8 @@ class agent_three():
         self.optimizer.apply_gradients(zip(board_lstm_grads,self.lstm_board_model.trainable_variables))
         self.optimizer.apply_gradients(zip(relation_grads,self.lstm_relation_model.trainable_variables))
 
+        action_lower.append([old_absolute_state_3,absolute_state_3,self.state_value(old_absolute_state_3),self.state_value(absolute_state_3),value_error_board,loss_board,board_grads,action,normdist_board])
+
         return relations
         
 class agent_two():
@@ -607,6 +609,8 @@ class agent_two():
         self.optimizer.apply_gradients(zip(msg4_grads,self.lstm_msg4_model.trainable_variables))
         self.optimizer.apply_gradients(zip(board_lstm_grads,self.lstm_board_model.trainable_variables))
         self.optimizer.apply_gradients(zip(relation_grads,self.lstm_relation_model.trainable_variables))
+
+        action_lower.append([old_absolute_state_2,absolute_state_2,self.state_value(old_absolute_state_2),self.state_value(absolute_state_2),value_error_board,loss_board,board_grads,action,normdist_board])
             
 class agent_one():
     def __init__(self):
@@ -796,6 +800,8 @@ class agent_one():
         self.optimizer.apply_gradients(zip(board_lstm_grads,self.lstm_board_model.trainable_variables))
         self.optimizer.apply_gradients(zip(relation_grads,self.lstm_relation_model.trainable_variables))
 
+        action_lower.append([old_absolute_state_1,absolute_state_1,self.state_value(old_absolute_state_1),self.state_value(absolute_state_1),value_error_board,loss_board,board_grads,board_action,normdist_board])
+
 #main program initialization
 checkers=checkers_environment()
 agent_one=agent_one()
@@ -811,7 +817,7 @@ terminal=False
 episode_history=[]
 while True:
     while terminal==False:
-        actions_lower=[]
+        action_lower=[]
         with tf.GradientTape(persistent=True) as tape:
             tape.watch(agent_three.lstm_msg1_model.trainable_variables)
             tape.watch(agent_three.lstm_msg2_model.trainable_variables)
@@ -831,7 +837,6 @@ while True:
             absolute_state_1=agent_one.state_concat_one(full_state)
             #get actions
             (board_action,normDistBoard)=agent_three.board_action(absolute_state_3)
-            actions_lower.append(agent_three.orig_action_history[-1])
             (message_action,normDistMessage)=agent_three.message_action(absolute_state_3)
             #get rewards
             (current_state, is_terminal, board_reward, general_reward)=checkers.env_step_board(board_action)
@@ -858,7 +863,6 @@ while True:
             absolute_state_1=agent_one.state_concat_one(full_state)
             #get actions
             (board_action,normDistBoard)=agent_one.board_action(absolute_state_1)
-            actions_lower.append(agent_one.orig_action_history[-1])
             (message_action,normDistMessage)=agent_one.message_action(absolute_state_1)
             #get rewards
             (current_state, is_terminal, board_reward, general_reward)=checkers.env_step_board(board_action)
@@ -877,7 +881,6 @@ while True:
             absolute_state_1=agent_one.state_concat_one(full_state)
             #get actions
             (board_action,normDistBoard)=agent_two.board_action(absolute_state_2)
-            actions_lower.append(agent_two.orig_action_history[-1])
             (message_action,normDistMessage)=agent_two.message_action(absolute_state_2)
             #get rewards
             (current_state, is_terminal, board_reward, general_reward)=checkers.env_step_board(board_action)
@@ -889,7 +892,7 @@ while True:
             agent_two.updateParameters(old_absolute_state_2,absolute_state_2,reward,board_action,message_action,normDistBoard,normDistMessage)
             print("agent 2 round done")
             tape.reset()
-        actions.append(actions_lower)
+        actions.append(action_lower)
         with open('actions.csv','w',newline='') as csvfile:
             writer=csv.writer(csvfile,dialect='excel')
             for x in actions:
