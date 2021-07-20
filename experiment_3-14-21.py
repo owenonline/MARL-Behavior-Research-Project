@@ -4,6 +4,7 @@ import os
 import numpy as np
 import math
 from random import randint
+import csv
 
 #hyperparameters
 #same for all 3 agents: 
@@ -543,7 +544,7 @@ class agentThree():
             self.lstm_biases[x][2]=np.transpose(self.lstm_biases[x][2]+r*gaError)
             self.lstm_biases[x][3]=np.transpose(self.lstm_biases[x][3]+r*oaError)
 
-        return relations
+        return relations, totalRewardAvg
         
 class agentTwo():
     def __init__(self):
@@ -862,6 +863,8 @@ class agentTwo():
             self.lstm_biases[x][1]=np.transpose(self.lstm_biases[x][1]+r*iaError)
             self.lstm_biases[x][2]=np.transpose(self.lstm_biases[x][2]+r*gaError)
             self.lstm_biases[x][3]=np.transpose(self.lstm_biases[x][3]+r*oaError)
+
+        return totalRewardAvg
 
         
             
@@ -1184,6 +1187,50 @@ class agentOne():
             self.lstm_biases[x][2]=np.transpose(self.lstm_biases[x][2]+r*gaError)
             self.lstm_biases[x][3]=np.transpose(self.lstm_biases[x][3]+r*oaError)
 
+        return totalRewardAvg
+
+
+#output function to track
+plot.ion()
+plot.style.use('ggplot')
+fig=plot.figure(figsize=(7,7))
+episode=1
+turn=1
+agent1avg=0
+agent2avg=0
+agent3avg=0
+episode_data=[]
+
+def turn_output(agent1message,agent2message,agent3message,agent1action,agent2action,agent3action,total_reward_1,total_reward_2,total_reward_3):
+    global episode_data
+    episode_data.append([agent1message,agent2message,agent3message,agent1action,agent2action,agent3action,total_reward_1,total_reward_2,total_reward_3])
+
+def episode_csv():
+    global episode_data, episode
+    with open('episode_'+str(episode)+'.csv','w',newline='') as csvfile:
+        writer=csv.writer(csvfile,dialect='excel')
+        for x in episode_data:
+            writer.writerow([y for y in x])
+    episode_data=[]
+
+def plotter_avg(agent1reward,agent2reward,agent3reward):
+    global agent1avg,agent2avg,agent3avg,turn
+    agent1avg=(agent1avg+agent1reward)/turn
+    agent2avg=(agent2avg+agent2reward)/turn
+    agent3avg=(agent3avg+agent3reward)/turn
+    turn=turn+1
+
+def plot_episode():
+    global episode,agent1avg,agent2avg,agent3avg,turn
+    plot.plot(episode,agent1avg,'ro')
+    plot.plot(episode,agent2avg,'go')
+    plot.plot(episode,agent3avg,'bo')
+    episode=episode+1
+    agent1avg=0
+    agent2avg=0
+    agent3avg=0
+    turn=0
+
 #main program
 checkers=checkersEnvironment()
 agentOne=agentOne()
@@ -1192,25 +1239,28 @@ agentThree=agentThree()
 
 checkers.envInit()
 fullState=checkers.envStart()
+
 terminal=False
 while True:
     while terminal==False:
         ###AGENT THREE ROUND###
         #set new states
-        print("agent three round first set of state concatenations")
         absoluteState3=agentThree.stateConcatThree(fullState,0)
         absoluteState2=agentTwo.stateConcatTwo(fullState)
         absoluteState1=agentOne.stateConcatOne(fullState)
         #get actions
         boardAction=agentThree.boardAction()
         messageAction=agentThree.messageAction()
-
+        #!for record keeping!#
+        agent3message=messageAction
+        agent3action=boardAction
+        #!end record keeping!#
+        
         #get rewards
         (currentState, isTerminal, boardReward, generalReward)=checkers.envStepBoard(boardAction)
         (totalSpeakingReward, totalListeningReward)=checkers.envStepMessage(agentThree.msgStateHistory,agentThree.message_history_self,agentThree.action_history_self,agentThree.external_message_history)
         reward=[boardReward,generalReward,totalSpeakingReward,totalListeningReward]
         (oldAbsoluteState1,oldAbsoluteState2,oldAbsoluteState3, fullState)=checkers.prepNewState(messageAction,isTerminal,reward,currentState,absoluteState1,absoluteState2,absoluteState3,3)
-        print("agent three round second set of state concatenations")
         absoluteState3=agentThree.stateConcatThree(fullState,0)
         absoluteState2=agentTwo.stateConcatTwo(fullState)
         absoluteState1=agentOne.stateConcatOne(fullState)
@@ -1218,37 +1268,48 @@ while True:
         currentStateValue2=agentTwo.stateValue(absoluteState2)
         oldStateValue1=agentOne.stateValue(oldAbsoluteState1)
         oldStateValue2=agentTwo.stateValue(oldAbsoluteState2)
-        relations=agentThree.updateParameters(oldAbsoluteState3,absoluteState3,currentStateValue1,currentStateValue2,oldStateValue1,oldStateValue2,reward)
+        (relations,total_reward_3)=agentThree.updateParameters(oldAbsoluteState3,absoluteState3,currentStateValue1,currentStateValue2,oldStateValue1,oldStateValue2,reward)
         print("agent Three round done")
         ###AGENT ONE ROUND###
         checkers.updateState(relations)
-        print("agent one round first set of state concatenations")
         absoluteState3=agentThree.stateConcatThree(fullState,0)
         absoluteState2=agentTwo.stateConcatTwo(fullState)
         absoluteState1=agentOne.stateConcatOne(fullState)
         boardAction=agentOne.boardAction()
         messageAction=agentOne.messageAction()
+        #!for record keeping!#
+        agent1message=messageAction
+        agent1action=boardAction
+        #!end record keeping!#
         (currentState, isTerminal, boardReward, generalReward)=checkers.envStepBoard(boardAction)
         (totalSpeakingReward, totalListeningReward)=checkers.envStepMessage(agentOne.msgStateHistory,agentOne.message_history_self,agentOne.action_history_self,agentOne.external_message_history)
         reward=[boardReward,generalReward,totalSpeakingReward,totalListeningReward]
         (oldAbsoluteState1,oldAbsoluteState2,oldAbsoluteState3, fullState)=checkers.prepNewState(messageAction,isTerminal,reward,currentState,absoluteState1,absoluteState2,absoluteState3,1)
-        agentOne.updateParameters(oldAbsoluteState1,absoluteState1,reward)
+        total_reward_1=agentOne.updateParameters(oldAbsoluteState1,absoluteState1,reward)
         print("agent One round done")
         ###AGENT TWO ROUND###
-        print("agent two round first set of state concatenations")
         absoluteState3=agentThree.stateConcatThree(fullState,1)
         absoluteState2=agentTwo.stateConcatTwo(fullState)
         absoluteState1=agentOne.stateConcatOne(fullState)
         boardAction=agentTwo.boardAction()
         messageAction=agentTwo.messageAction()
+        #!for record keeping!#
+        agent2message=messageAction
+        agent2action=boardAction
+        #!end record keeping!#
         (currentState, isTerminal, boardReward, generalReward)=checkers.envStepBoard(boardAction)
         (totalSpeakingReward, totalListeningReward)=checkers.envStepMessage(agentTwo.msgStateHistory,agentTwo.message_history_self,agentTwo.action_history_self,agentTwo.external_message_history)
         reward=[boardReward,generalReward,totalSpeakingReward,totalListeningReward]
         (oldAbsoluteState1,oldAbsoluteState2,oldAbsoluteState3, fullState)=checkers.prepNewState(messageAction,isTerminal,reward,currentState,absoluteState1,absoluteState2,absoluteState3,2)
-        agentTwo.updateParameters(oldAbsoluteState2,absoluteState2,reward)
+        total_reward_2=agentTwo.updateParameters(oldAbsoluteState2,absoluteState2,reward)
         print("agent Two round done")
+        ### still needs to be finished
+        turn_output(agent1message,agent2message,agent3message,agent1action,agent2action,agent3action,total_reward_1,total_reward_2,total_reward_3)
+        plotter_avg(total_reward_1,total_reward_2,total_reward_3)
         if isTerminal==True:
             terminal=True
+    episode_csv()
+    plot_episode()
     fullState=checkers.envStart()
 
     
