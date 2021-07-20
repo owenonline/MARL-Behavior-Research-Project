@@ -260,7 +260,7 @@ class agentThree():
 
         self.lstm_inputs=[]
         
-    def stateConcatThree(self, fullState):
+    def stateConcatThree(self, fullState, msg):
         reward=fullState[2]
         boardState=fullState[1]
         temp=[]
@@ -279,8 +279,9 @@ class agentThree():
         for y in self.external_message_history:
             if (y==np.concatenate((messageThree,messageFour))).all():
                 x=1
-        if x==0:
+        if x==0 and msg!=1:
             self.external_message_history.append(np.concatenate((messageThree,messageFour)))
+            print("agent three message history increased from "+str(len(self.external_message_history)-1)+" to "+str(len(self.external_message_history)))
         lstm_inputs=[messageOne,messageTwo,messageThree,messageFour,boardState,relationVals]
         self.lstm_inputs.append(lstm_inputs)
         for x in range(len(lstm_inputs)):
@@ -390,7 +391,17 @@ class agentThree():
         p2=[stepSizeBoard-x for x in mean_board]
         p3=np.multiply(p1,p2)
         self.board_policy_biases=self.board_policy_biases+[stepSizeBoard*x for x in p3]
-        p4=np.matmul(np.array(list(zip(p3))),np.transpose(np.array(list(zip(oldAbsoluteState3)))))
+        #
+        #
+        #
+        #THERE WAS A CHANGE HERE
+        #
+        #
+        #
+        p3=flatten(p3)
+        oldAbsoluteState3=flatten(oldAbsoluteState3)
+        p4=np.dot(np.array(list(zip(p3))),np.transpose(np.array(list(zip(oldAbsoluteState3)))))
+        #p4=np.matmul(np.array(list(zip(p3))),np.transpose(np.array(list(zip(oldAbsoluteState3)))))
         gradient_mean_board=p4
         ##
         ##
@@ -399,7 +410,17 @@ class agentThree():
         p3=np.multiply(p1,p2)
         p4=[x-1 for x in p3]
         self.board_policy_std_biases=self.board_policy_std_biases+[stepSizeBoard*x for x in p4]
-        p5=np.matmul(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState3)))))
+        #
+        #
+        #
+        #THERE WAS A CHANGE HERE
+        #
+        #
+        #
+        p4=flatten(p4)
+        oldAbsoluteState3=flatten(oldAbsoluteState3)
+        p5=np.dot(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState3)))))
+        #p5=np.matmul(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState3)))))
         gradient_std_board=p5
         ##
         self.board_policy_params=self.board_policy_params+np.multiply((stepSizeBoard*self.I*valueError),gradient_mean_board)
@@ -414,7 +435,17 @@ class agentThree():
         p2=[stepSizeMessage-x for x in mean_message]
         p3=np.multiply(p1,p2)
         self.msg_policy_biases=self.msg_policy_biases+[stepSizeMessage*x for x in p3]
-        p4=np.matmul(np.array(list(zip(p3))),np.transpose(np.array(list(zip(oldAbsoluteState3)))))
+        #
+        #
+        #
+        #THERE WAS A CHANGE HERE
+        #
+        #
+        #
+        p3=flatten(p3)
+        oldAbsoluteState3=flatten(oldAbsoluteState3)
+        p4=np.dot(np.array(list(zip(p3))),np.transpose(np.array(list(zip(oldAbsoluteState3)))))
+        #p4=np.matmul(np.array(list(zip(p3))),np.transpose(np.array(list(zip(oldAbsoluteState3)))))
         gradient_mean_message=p4
         ##
         ##
@@ -423,7 +454,17 @@ class agentThree():
         p3=np.multiply(p1,p2)
         p4=[x-1 for x in p3]
         self.msg_policy_std_biases=self.msg_policy_std_biases+[stepSizeMessage*x for x in p4]
-        p5=np.matmul(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState3)))))
+        #
+        #
+        #
+        #THERE WAS A CHANGE HERE
+        #
+        #
+        #
+        p4=flatten(p4)
+        oldAbsoluteState3=flatten(oldAbsoluteState3)
+        p5=np.dot(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState3)))))
+        #p5=np.matmul(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState3)))))
         gradient_std_message=p5
         ##
         self.msg_policy_params=self.msg_policy_params+np.multiply((stepSizeMessage*self.I*valueError),gradient_mean_message)
@@ -575,6 +616,7 @@ class agentTwo():
                 x=1
         if x==0:
             self.external_message_history.append(messageTwo)
+            print("agent two message history increased from "+str(len(self.external_message_history)-1)+" to "+str(len(self.external_message_history)))
         lstm_inputs=[messageTwo,messageFour,boardState,relationVal]
         self.lstm_inputs.append(lstm_inputs)
         for x in range(len(lstm_inputs)):
@@ -671,7 +713,17 @@ class agentTwo():
         p2=[stepSizeBoard-x for x in mean_board]
         p3=np.multiply(p1,p2)
         self.board_policy_biases=self.board_policy_biases+[stepSizeBoard*x for x in p3]
-        p4=np.matmul(np.array(list(zip(p3))),np.transpose(np.array(list(zip(oldAbsoluteState2)))))
+        #
+        #
+        #
+        #THERE WAS A CHANGE HERE
+        #
+        #
+        #
+        p3=flatten(p3)
+        oldAbsoluteState2=flatten(oldAbsoluteState2)
+        p4=np.dot(np.array(list(zip(p3))),np.transpose(np.array(list(zip(oldAbsoluteState2)))))
+        #p4=np.matmul(np.array(list(zip(p3))),np.transpose(np.array(list(zip(oldAbsoluteState2)))))
         gradient_mean_board=p4
         ##
         ##
@@ -680,7 +732,17 @@ class agentTwo():
         p3=np.multiply(p1,p2)
         p4=[x-1 for x in p3]
         self.board_policy_std_biases=self.board_policy_std_biases+[stepSizeBoard*x for x in p4]
-        p5=np.matmul(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState2)))))
+        #
+        #
+        #
+        #THERE WAS A CHANGE HERE
+        #
+        #
+        #
+        p4=flatten(p4)
+        oldAbsoluteState2=flatten(oldAbsoluteState2)
+        p5=np.dot(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState2)))))
+        #p5=np.matmul(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState2)))))
         gradient_std_board=p5
         ##
         self.board_policy_params=self.board_policy_params+np.multiply((stepSizeBoard*self.I*valueError),gradient_mean_board)
@@ -695,7 +757,17 @@ class agentTwo():
         p2=[stepSizeMessage-x for x in mean_message]
         p3=np.multiply(p1,p2)
         self.msg_policy_biases=self.msg_policy_biases+[stepSizeMessage*x for x in p3]
-        p4=np.matmul(np.array(list(zip(p3))),np.transpose(np.array(list(zip(oldAbsoluteState2)))))
+        #
+        #
+        #
+        #THERE WAS A CHANGE HERE
+        #
+        #
+        #
+        p3=flatten(p3)
+        oldAbsoluteState2=flatten(oldAbsoluteState2)
+        p4=np.dot(np.array(list(zip(p3))),np.transpose(np.array(list(zip(oldAbsoluteState2)))))
+        #p4=np.matmul(np.array(list(zip(p3))),np.transpose(np.array(list(zip(oldAbsoluteState2)))))
         gradient_mean_message=p4
         ##
         ##
@@ -704,7 +776,17 @@ class agentTwo():
         p3=np.multiply(p1,p2)
         p4=[x-1 for x in p3]
         self.msg_policy_std_biases=self.msg_policy_std_biases+[stepSizeMessage*x for x in p4]
-        p5=np.matmul(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState2)))))
+        #
+        #
+        #
+        #THERE WAS A CHANGE HERE
+        #
+        #
+        #
+        p4=flatten(p4)
+        oldAbsoluteState2=flatten(oldAbsoluteState2)
+        p5=np.dot(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState2)))))
+        #p5=np.matmul(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState2)))))
         gradient_std_message=p5
         ##
         self.msg_policy_params=self.msg_policy_params+np.multiply((stepSizeMessage*self.I*valueError),gradient_mean_message)
@@ -855,6 +937,7 @@ class agentOne():
                 x=1
         if x==0:
             self.external_message_history.append(messageOne)
+            print("agent one message history increased from "+str(len(self.external_message_history)-1)+" to "+str(len(self.external_message_history)))
         lstm_inputs=[messageOne,messageThree,boardState,relationVal]
         self.lstm_inputs.append(lstm_inputs)
         for x in range(len(lstm_inputs)):
@@ -970,7 +1053,17 @@ class agentOne():
         p3=np.multiply(p1,p2)
         p4=[x-1 for x in p3]
         self.board_policy_std_biases=self.board_policy_std_biases+[stepSizeBoard*x for x in p4]
-        p5=np.matmul(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState1)))))
+        #
+        #
+        #
+        #THERE WAS A CHANGE HERE
+        #
+        #
+        #
+        p4=flatten(p4)
+        oldAbsoluteState1=flatten(oldAbsoluteState1)
+        p5=np.dot(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState1)))))
+        #p5=np.matmul(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState1)))))
         gradient_std_board=p5
         ##
         self.board_policy_params=self.board_policy_params+np.multiply((stepSizeBoard*self.I*valueError),gradient_mean_board)
@@ -1104,7 +1197,8 @@ while True:
     while terminal==False:
         ###AGENT THREE ROUND###
         #set new states
-        absoluteState3=agentThree.stateConcatThree(fullState)
+        print("agent three round first set of state concatenations")
+        absoluteState3=agentThree.stateConcatThree(fullState,0)
         absoluteState2=agentTwo.stateConcatTwo(fullState)
         absoluteState1=agentOne.stateConcatOne(fullState)
         #get actions
@@ -1116,7 +1210,8 @@ while True:
         (totalSpeakingReward, totalListeningReward)=checkers.envStepMessage(agentThree.msgStateHistory,agentThree.message_history_self,agentThree.action_history_self,agentThree.external_message_history)
         reward=[boardReward,generalReward,totalSpeakingReward,totalListeningReward]
         (oldAbsoluteState1,oldAbsoluteState2,oldAbsoluteState3, fullState)=checkers.prepNewState(messageAction,isTerminal,reward,currentState,absoluteState1,absoluteState2,absoluteState3,3)
-        absoluteState3=agentThree.stateConcatThree(fullState)
+        print("agent three round second set of state concatenations")
+        absoluteState3=agentThree.stateConcatThree(fullState,0)
         absoluteState2=agentTwo.stateConcatTwo(fullState)
         absoluteState1=agentOne.stateConcatOne(fullState)
         currentStateValue1=agentOne.stateValue(absoluteState1)
@@ -1127,7 +1222,8 @@ while True:
         print("agent Three round done")
         ###AGENT ONE ROUND###
         checkers.updateState(relations)
-        absoluteState3=agentThree.stateConcatThree(fullState)
+        print("agent one round first set of state concatenations")
+        absoluteState3=agentThree.stateConcatThree(fullState,0)
         absoluteState2=agentTwo.stateConcatTwo(fullState)
         absoluteState1=agentOne.stateConcatOne(fullState)
         boardAction=agentOne.boardAction()
@@ -1139,7 +1235,8 @@ while True:
         agentOne.updateParameters(oldAbsoluteState1,absoluteState1,reward)
         print("agent One round done")
         ###AGENT TWO ROUND###
-        absoluteState3=agentThree.stateConcatThree(fullState)
+        print("agent two round first set of state concatenations")
+        absoluteState3=agentThree.stateConcatThree(fullState,1)
         absoluteState2=agentTwo.stateConcatTwo(fullState)
         absoluteState1=agentOne.stateConcatOne(fullState)
         boardAction=agentTwo.boardAction()
