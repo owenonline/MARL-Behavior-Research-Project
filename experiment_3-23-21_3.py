@@ -2,6 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plot
 import tensorflow as tf
 import tensorflow_probability as tfp
+import csv
+
+actions=[]
 
 def tensor_conversion(x,lstm):
     arr=np.array(x)
@@ -798,7 +801,6 @@ checkers=checkers_environment()
 agent_one=agent_one()
 agent_two=agent_two()
 agent_three=agent_three()
-
 checkers.env_init()
 
 #make startup variables here
@@ -809,6 +811,7 @@ terminal=False
 episode_history=[]
 while True:
     while terminal==False:
+        actions_lower=[]
         with tf.GradientTape(persistent=True) as tape:
             tape.watch(agent_three.lstm_msg1_model.trainable_variables)
             tape.watch(agent_three.lstm_msg2_model.trainable_variables)
@@ -828,6 +831,7 @@ while True:
             absolute_state_1=agent_one.state_concat_one(full_state)
             #get actions
             (board_action,normDistBoard)=agent_three.board_action(absolute_state_3)
+            actions_lower.append(agent_three.orig_action_history[-1])
             (message_action,normDistMessage)=agent_three.message_action(absolute_state_3)
             #get rewards
             (current_state, is_terminal, board_reward, general_reward)=checkers.env_step_board(board_action)
@@ -854,6 +858,7 @@ while True:
             absolute_state_1=agent_one.state_concat_one(full_state)
             #get actions
             (board_action,normDistBoard)=agent_one.board_action(absolute_state_1)
+            actions_lower.append(agent_one.orig_action_history[-1])
             (message_action,normDistMessage)=agent_one.message_action(absolute_state_1)
             #get rewards
             (current_state, is_terminal, board_reward, general_reward)=checkers.env_step_board(board_action)
@@ -872,6 +877,7 @@ while True:
             absolute_state_1=agent_one.state_concat_one(full_state)
             #get actions
             (board_action,normDistBoard)=agent_two.board_action(absolute_state_2)
+            actions_lower.append(agent_two.orig_action_history[-1])
             (message_action,normDistMessage)=agent_two.message_action(absolute_state_2)
             #get rewards
             (current_state, is_terminal, board_reward, general_reward)=checkers.env_step_board(board_action)
@@ -883,6 +889,11 @@ while True:
             agent_two.updateParameters(old_absolute_state_2,absolute_state_2,reward,board_action,message_action,normDistBoard,normDistMessage)
             print("agent 2 round done")
             tape.reset()
+        actions.append(actions_lower)
+        with open('actions.csv','w',newline='') as csvfile:
+            writer=csv.writer(csvfile,dialect='excel')
+            for x in actions:
+                writer.writerow(x)
         if is_terminal==True:
             terminal=True
     episode_history.append("placeholder")
