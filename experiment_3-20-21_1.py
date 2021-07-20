@@ -40,19 +40,36 @@ def flatten(matrix):
 def tanh_derivative(X):
     return 1-(X**2)
 
+def tensor_conversion(x,lstm):
+    arr=np.array(x)
+    arr=arr.flatten()
+    arr=np.float32(arr)
+    if lstm==True:
+        arr=np.expand_dims(np.expand_dims(arr, axis=0), axis=0)
+    else:
+        arr=np.expand_dims(arr, axis=0)
+    arr=tf.convert_to_tensor(arr)
+    return arr
+
+def numpy_conversion(x):
+    arr=x.numpy()
+    arr=np.transpose(arr)
+    arr=arr.flatten()
+    return arr
+    
 class checkersEnvironment():
     def envInit(self):
-        self.terminal=[[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]]
+        self.terminal=[[0.0,0.0],[0.0,0.0],[0.0,0.0],[0.0,0.0],[0.0,0.0],[0.0,0.0]]
         
     def envStart(self):
         #reward is a 3x3 matrix. The first row is the message reward (based on how much the messages relate to the actions taken), the second row is the board reward (based on the legal movement of pieces; >=0), the third is general reward (based on winning or losing the game)
-        reward=[[0,0,0],[0,0,0],[0,0,0]]
+        reward=[[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0]]
         #messages is a vector for 4 messages of length 0-100. message 1 is from agent 3 to agent 1, message 2 is from agent 3 to agent 2, message 3 is from agent 1 to agent 3, and message 4 is from agent 2 to agent 3
-        messages=[list(0 for x in range(100)),list(0 for x in range(100)),list(0 for x in range(100)),list(0 for x in range(100))]
+        messages=[list(0.0 for x in range(100)),list(0.0 for x in range(100)),list(0.0 for x in range(100)),list(0.0 for x in range(100))]
         #relation for agent 1 then 2
-        relationVals=[0,0]
+        relationVals=[0.0,0.0]
         #(y,x)
-        boardState=[[[2,1],[1,2],[2,3],[1,4],[2,5],[1,6]],[[6,1],[5,2],[6,3],[5,4],[6,5],[5,6]]]
+        boardState=[[[2.0,1.0],[1.0,2.0],[2.0,3.0],[1.0,4.0],[2.0,5.0],[1.0,6.0]],[[6.0,1],[5.0,2.0],[6.0,3.0],[5.0,4.0],[6.0,5.0],[5.0,6.0]]]
         isTerminal=False
         self.fullState=(reward,boardState,isTerminal,messages,relationVals)
         return self.fullState
@@ -215,56 +232,68 @@ class agentThree():
     def __init__(self):
         ####################################TENSORFLOW VARIABLES####################################
         #lstms
-        msg1=tf.keras.Input(shape=(100,1))
+        msg1=tf.keras.Input(shape=(1,100))
         lstm_msg1=tf.keras.layers.LSTM(300,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)(msg1)
         self.lstm_msg1_model=tf.keras.Model(inputs=msg1,outputs=lstm_msg1)
 
-        msg2=tf.keras.Input(shape=(100,1))
+        msg2=tf.keras.Input(shape=(1,100))
         lstm_msg2=tf.keras.layers.LSTM(300,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)(msg2)
         self.lstm_msg2_model=tf.keras.Model(inputs=msg2,outputs=lstm_msg2)
 
-        msg3=tf.keras.Input(shape=(100,1))
+        msg3=tf.keras.Input(shape=(1,100))
         lstm_msg3=tf.keras.layers.LSTM(300,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)(msg3)
         self.lstm_msg3_model=tf.keras.Model(inputs=msg3,outputs=lstm_msg3)
         
-        msg4=tf.keras.Input(shape=(100,1))
+        msg4=tf.keras.Input(shape=(1,100))
         lstm_msg4=tf.keras.layers.LSTM(300,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)(msg4)
         self.lstm_msg4_model=tf.keras.Model(inputs=msg4,outputs=lstm_msg4)
 
-        #THIS IS WHERE IM WORKING RIGHT NOW
-        self.lstm_board=tf.keras.layers.LSTM(200,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)
-        self.lstm_relation=tf.keras.layers.LSTM(50,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)
+        board=tf.keras.Input(shape=(1,24))
+        lstm_board=tf.keras.layers.LSTM(200,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)(board)
+        self.lstm_board_model=tf.keras.Model(inputs=board,outputs=lstm_board)
+
+        relation=tf.keras.Input(shape=(1,2))
+        lstm_relation=tf.keras.layers.LSTM(50,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)(relation)
+        self.lstm_relation_model=tf.keras.Model(inputs=relation,outputs=lstm_relation)
         #ffns
-        self.ffn_1=tf.keras.layers.Dense(1200,activation='relu',use_bias=True)
-        self.ffn_2=tf.keras.layers.Dense(950,activation='relu',use_bias=True)
-        self.ffn_3=tf.keras.layers.Dense(700,activation='relu',use_bias=True)
-        self.ffn_4=tf.keras.layers.Dense(450,activation='relu',use_bias=True)
-        self.ffn_5=tf.keras.layers.Dense(200,activation='relu',use_bias=True)
+        full_state=tf.keras.Input(shape=(1,1450))
+        ffn_1=tf.keras.layers.Dense(1200,activation='relu',use_bias=True)(full_state)
+        ffn_2=tf.keras.layers.Dense(950,activation='relu',use_bias=True)(ffn_1)
+        ffn_3=tf.keras.layers.Dense(700,activation='relu',use_bias=True)(ffn_2)
+        ffn_4=tf.keras.layers.Dense(450,activation='relu',use_bias=True)(ffn_3)
+        ffn_5=tf.keras.layers.Dense(200,activation='relu',use_bias=True)(ffn_4)
+        self.ffn_model=tf.keras.Model(inputs=full_state,outputs=ffn_5)
         #board policy ffns
-        self.board_hidden_1=tf.keras.layers.Dense(250,activation='relu',use_bias='true')
-        self.board_hidden_2=tf.keras.layers.Dense(200,activation='relu',use_bias='true')
-        self.board_hidden_3=tf.keras.layers.Dense(150,activation='relu',use_bias='true')
-        self.board_hidden_4=tf.keras.layers.Dense(100,activation='relu',use_bias='true')
-        self.board_hidden_5=tf.keras.layers.Dense(20,activation='relu',use_bias='true')
-        self.board_mu=tf.keras.layers.Dense(8,activation='relu',use_bias='true')
-        self.board_sigma=tf.keras.layers.Dense(8,activation='relu',use_bias='true')
+        absolute_state=tf.keras.Input(shape=(1,200))
+        board_hidden_1=tf.keras.layers.Dense(250,activation='relu',use_bias='true')(absolute_state)
+        board_hidden_2=tf.keras.layers.Dense(200,activation='relu',use_bias='true')(board_hidden_1)
+        board_hidden_3=tf.keras.layers.Dense(150,activation='relu',use_bias='true')(board_hidden_2)
+        board_hidden_4=tf.keras.layers.Dense(100,activation='relu',use_bias='true')(board_hidden_3)
+        board_hidden_5=tf.keras.layers.Dense(20,activation='relu',use_bias='true')(board_hidden_4)
+        board_mu=tf.keras.layers.Dense(8,activation='relu',use_bias='true')(board_hidden_5)
+        board_sigma=tf.keras.layers.Dense(8,activation='relu',use_bias='true')(board_hidden_5)
+        self.board_model=tf.keras.Model(inputs=absolute_state,outputs=[board_mu,board_sigma])
         #message policy ffns
-        self.message_hidden_1=tf.keras.layers.Dense(250,activation='relu',use_bias='true')
-        self.message_hidden_2=tf.keras.layers.Dense(300,activation='relu',use_bias='true')
-        self.message_hidden_3=tf.keras.layers.Dense(350,activation='relu',use_bias='true')
-        self.message_hidden_4=tf.keras.layers.Dense(400,activation='relu',use_bias='true')
-        self.message_hidden_5=tf.keras.layers.Dense(350,activation='relu',use_bias='true')
-        self.message_hidden_6=tf.keras.layers.Dense(300,activation='relu',use_bias='true')
-        self.message_hidden_7=tf.keras.layers.Dense(250,activation='relu',use_bias='true')
-        self.message_mu=tf.keras.layers.Dense(200,activation='relu',use_bias='true')
-        self.message_sigma=tf.keras.layers.Dense(200,activation='relu',use_bias='true')
+        absolute_state=tf.keras.Input(shape=(1,200))
+        message_hidden_1=tf.keras.layers.Dense(250,activation='relu',use_bias='true')(absolute_state)
+        message_hidden_2=tf.keras.layers.Dense(300,activation='relu',use_bias='true')(message_hidden_1)
+        message_hidden_3=tf.keras.layers.Dense(350,activation='relu',use_bias='true')(message_hidden_2)
+        message_hidden_4=tf.keras.layers.Dense(400,activation='relu',use_bias='true')(message_hidden_3)
+        message_hidden_5=tf.keras.layers.Dense(350,activation='relu',use_bias='true')(message_hidden_4)
+        message_hidden_6=tf.keras.layers.Dense(300,activation='relu',use_bias='true')(message_hidden_5)
+        message_hidden_7=tf.keras.layers.Dense(250,activation='relu',use_bias='true')(message_hidden_6)
+        message_mu=tf.keras.layers.Dense(200,activation='relu',use_bias='true')(message_hidden_7)
+        message_sigma=tf.keras.layers.Dense(200,activation='relu',use_bias='true')(message_hidden_7)
+        self.message_model=tf.keras.Model(inputs=absolute_state,outputs=[message_mu,message_sigma])
         #value function ffns
-        self.value_hidden_1=tf.keras.layers.Dense(300,activation='relu',use_bias='true')
-        self.value_hidden_2=tf.keras.layers.Dense(400,activation='relu',use_bias='true')
-        self.value_hidden_3=tf.keras.layers.Dense(300,activation='relu',use_bias='true')
-        self.value_hidden_4=tf.keras.layers.Dense(200,activation='relu',use_bias='true')
-        self.value_hidden_5=tf.keras.layers.Dense(100,activation='relu',use_bias='true')
-        self.value_hidden_6=tf.keras.layers.Dense(1,activation='relu',use_bias='true')
+        absolute_state=tf.keras.Input(shape=(1,200))
+        value_hidden_1=tf.keras.layers.Dense(300,activation='relu',use_bias='true')(absolute_state)
+        value_hidden_2=tf.keras.layers.Dense(400,activation='relu',use_bias='true')(value_hidden_1)
+        value_hidden_3=tf.keras.layers.Dense(300,activation='relu',use_bias='true')(value_hidden_2)
+        value_hidden_4=tf.keras.layers.Dense(200,activation='relu',use_bias='true')(value_hidden_3)
+        value_hidden_5=tf.keras.layers.Dense(100,activation='relu',use_bias='true')(value_hidden_4)
+        value_hidden_6=tf.keras.layers.Dense(1,activation='relu',use_bias='true')(value_hidden_5)
+        self.value_model=tf.keras.Model(inputs=absolute_state,outputs=value_hidden_6)
         #value retention lists
         self.absolute_state_history=[]
         self.message_history_self=[np.zeros(200)]
@@ -298,36 +327,30 @@ class agentThree():
         if x==0 and msg!=1:
             self.external_message_history.append(np.concatenate((messageThree,messageFour)))
 
-        msg1_output=self.lstm_msg1(messageOne)
-        msg2_output=self.lstm_msg2(messageTwo)
-        msg3_output=self.lstm_msg3(messageThree)
-        msg4_output=self.lstm_msg4(messageFour)
-        board_output=self.lstm_board(boardState)
-        relation_output=self.lstm_relation(relationVal)
+        msg1_output=self.lstm_msg1_model(tensor_conversion(messageOne,True))
+        msg2_output=self.lstm_msg2_model(tensor_conversion(messageTwo,True))
+        msg3_output=self.lstm_msg3_model(tensor_conversion(messageThree,True))
+        msg4_output=self.lstm_msg4_model(tensor_conversion(messageFour,True))
+        board_output=self.lstm_board_model(tensor_conversion(boardState,True))
+        relation_output=self.lstm_relation_model(tensor_conversion(relationVals,True))
 
-        concat_state=np.concatenate((msg1_output,msg2_output,msg3_output,msg4_output,board_output,relation_output))
+        concat_state=np.concatenate((numpy_conversion(msg1_output),numpy_conversion(msg2_output),numpy_conversion(msg3_output),numpy_conversion(msg4_output),numpy_conversion(board_output),numpy_conversion(relation_output)))
 
-        ffn1=self.ffn_1(concat_state)
-        ffn2=self.ffn_2(ffn1)
-        ffn3=self.ffn_3(ffn2)
-        ffn4=self.ffn_4(ffn3)
-        state=self.ffn_5(ffn4)
+        state=self.ffn_model(tensor_conversion(concat_state,False))
+
+        state=numpy_conversion(state)
 
         self.absolute_state_history.append(state)
         
         return state
 
     def boardAction(self, state):
-        board1=self.board_hidden_1(state)
-        board2=self.board_hidden_2(board1)
-        board3=self.board_hidden_3(board2)
-        board4=self.board_hidden_4(board3)
-        board5=self.board_hidden_5(board4)
-        mean=self.board_mu(board5)
-        std=self.board_sigma(board5)
+        (mean,std)=self.board_model(tensor_conversion(state,False))
 
         norm_dist=tf.compat.v1.distributions.Normal(mean,std)
         action=tf.squeeze(norm_dist.sample(1),axis=0)
+
+        action=numpy_conversion(action)
         
         if action[0]>-1.5:
             action[0]=-1
@@ -342,18 +365,12 @@ class agentThree():
         return boardAction, norm_dist
 
     def messageAction(self, state):
-        msg1=self.message_hidden_1(state)
-        msg2=self.message_hidden_2(msg1)
-        msg3=self.message_hidden_3(msg2)
-        msg4=self.message_hidden_4(msg3)
-        msg5=self.message_hidden_5(msg4)
-        msg6=self.message_hidden_6(msg5)
-        msg7=self.message_hidden_7(msg6)
-        mean=self.message_mu(msg7)
-        std=self.message_sigma(msg7)
+        (mean,std)=self.message_model(tensor_conversion(state,False))
 
         norm_dist=tf.compat.v1.distributions.Normal(mean,std)
         messages=tf.squeeze(norm_dist.sample(1),axis=0)
+
+        messages=numpy_conversion(messages)
         
         message1=messages[0:100]
         message2=messages[100:200]
@@ -381,46 +398,67 @@ class agentThree():
         self.generalReward_history.append(generalReward)
         self.totalSpeakingReward_history.append(totalSpeakingReward)
         self.totalListeningReward_history.append(totalListeningReward)
+
+        return relations
         
 class agentTwo():
     def __init__(self):
         ####################################TENSORFLOW VARIABLES####################################
         #lstms
-        self.lstm_msg2=tf.keras.layers.LSTM(300,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)
-        self.lstm_msg4=tf.keras.layers.LSTM(300,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)
-        self.lstm_board=tf.keras.layers.LSTM(200,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)
-        self.lstm_relation=tf.keras.layers.LSTM(50,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)
+        msg2=tf.keras.Input(shape=(1,100))
+        lstm_msg2=tf.keras.layers.LSTM(300,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)(msg2)
+        self.lstm_msg2_model=tf.keras.Model(inputs=msg2,outputs=lstm_msg2)
+
+        msg4=tf.keras.Input(shape=(1,100))
+        lstm_msg4=tf.keras.layers.LSTM(300,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)(msg4)
+        self.lstm_msg4_model=tf.keras.Model(inputs=msg4,outputs=lstm_msg4)
+
+        board=tf.keras.Input(shape=(1,24))
+        lstm_board=tf.keras.layers.LSTM(200,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)(board)
+        self.lstm_board_model=tf.keras.Model(inputs=board,outputs=lstm_board)
+
+        relation=tf.keras.Input(shape=(1,1))
+        lstm_relation=tf.keras.layers.LSTM(50,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)(relation)
+        self.lstm_relation_model=tf.keras.Model(inputs=relation,outputs=lstm_relation)
         #ffns
-        self.ffn_1=tf.keras.layers.Dense(720,activation='relu',use_bias=True)
-        self.ffn_2=tf.keras.layers.Dense(590,activation='relu',use_bias=True)
-        self.ffn_3=tf.keras.layers.Dense(460,activation='relu',use_bias=True)
-        self.ffn_4=tf.keras.layers.Dense(330,activation='relu',use_bias=True)
-        self.ffn_5=tf.keras.layers.Dense(200,activation='relu',use_bias=True)
+        full_state=tf.keras.Input(shape=(1,850))
+        ffn_1=tf.keras.layers.Dense(720,activation='relu',use_bias=True)(full_state)
+        ffn_2=tf.keras.layers.Dense(590,activation='relu',use_bias=True)(ffn_1)
+        ffn_3=tf.keras.layers.Dense(460,activation='relu',use_bias=True)(ffn_2)
+        ffn_4=tf.keras.layers.Dense(330,activation='relu',use_bias=True)(ffn_3)
+        ffn_5=tf.keras.layers.Dense(200,activation='relu',use_bias=True)(ffn_4)
+        self.ffn_model=tf.keras.Model(inputs=full_state,outputs=ffn_5)
         #board policy ffns
-        self.board_hidden_1=tf.keras.layers.Dense(250,activation='relu',use_bias='true')
-        self.board_hidden_2=tf.keras.layers.Dense(200,activation='relu',use_bias='true')
-        self.board_hidden_3=tf.keras.layers.Dense(150,activation='relu',use_bias='true')
-        self.board_hidden_4=tf.keras.layers.Dense(100,activation='relu',use_bias='true')
-        self.board_hidden_5=tf.keras.layers.Dense(20,activation='relu',use_bias='true')
-        self.board_mu=tf.keras.layers.Dense(7,activation='relu',use_bias='true')
-        self.board_sigma=tf.keras.layers.Dense(7,activation='relu',use_bias='true')
+        absolute_state=tf.keras.Input(shape=(1,200))
+        board_hidden_1=tf.keras.layers.Dense(250,activation='relu',use_bias='true')(absolute_state)
+        board_hidden_2=tf.keras.layers.Dense(200,activation='relu',use_bias='true')(board_hidden_1)
+        board_hidden_3=tf.keras.layers.Dense(150,activation='relu',use_bias='true')(board_hidden_2)
+        board_hidden_4=tf.keras.layers.Dense(100,activation='relu',use_bias='true')(board_hidden_3)
+        board_hidden_5=tf.keras.layers.Dense(20,activation='relu',use_bias='true')(board_hidden_4)
+        board_mu=tf.keras.layers.Dense(7,activation='relu',use_bias='true')(board_hidden_5)
+        board_sigma=tf.keras.layers.Dense(7,activation='relu',use_bias='true')(board_hidden_5)
+        self.board_model=tf.keras.Model(inputs=absolute_state,outputs=[board_mu,board_sigma])
         #message policy ffns
-        self.message_hidden_1=tf.keras.layers.Dense(250,activation='relu',use_bias='true')
-        self.message_hidden_2=tf.keras.layers.Dense(300,activation='relu',use_bias='true')
-        self.message_hidden_3=tf.keras.layers.Dense(350,activation='relu',use_bias='true')
-        self.message_hidden_4=tf.keras.layers.Dense(300,activation='relu',use_bias='true')
-        self.message_hidden_5=tf.keras.layers.Dense(250,activation='relu',use_bias='true')
-        self.message_hidden_6=tf.keras.layers.Dense(200,activation='relu',use_bias='true')
-        self.message_hidden_7=tf.keras.layers.Dense(150,activation='relu',use_bias='true')
-        self.message_mu=tf.keras.layers.Dense(100,activation='relu',use_bias='true')
-        self.message_sigma=tf.keras.layers.Dense(100,activation='relu',use_bias='true')
+        absolute_state=tf.keras.Input(shape=(1,200))
+        message_hidden_1=tf.keras.layers.Dense(250,activation='relu',use_bias='true')(absolute_state)
+        message_hidden_2=tf.keras.layers.Dense(300,activation='relu',use_bias='true')(message_hidden_1)
+        message_hidden_3=tf.keras.layers.Dense(350,activation='relu',use_bias='true')(message_hidden_2)
+        message_hidden_4=tf.keras.layers.Dense(300,activation='relu',use_bias='true')(message_hidden_3)
+        message_hidden_5=tf.keras.layers.Dense(250,activation='relu',use_bias='true')(message_hidden_4)
+        message_hidden_6=tf.keras.layers.Dense(200,activation='relu',use_bias='true')(message_hidden_5)
+        message_hidden_7=tf.keras.layers.Dense(150,activation='relu',use_bias='true')(message_hidden_6)
+        message_mu=tf.keras.layers.Dense(100,activation='relu',use_bias='true')(message_hidden_7)
+        message_sigma=tf.keras.layers.Dense(100,activation='relu',use_bias='true')(message_hidden_7)
+        self.message_model=tf.keras.Model(inputs=absolute_state,outputs=[message_mu,message_sigma])
         #value function ffns
-        self.value_hidden_1=tf.keras.layers.Dense(300,activation='relu',use_bias='true')
-        self.value_hidden_2=tf.keras.layers.Dense(400,activation='relu',use_bias='true')
-        self.value_hidden_3=tf.keras.layers.Dense(300,activation='relu',use_bias='true')
-        self.value_hidden_4=tf.keras.layers.Dense(200,activation='relu',use_bias='true')
-        self.value_hidden_5=tf.keras.layers.Dense(100,activation='relu',use_bias='true')
-        self.value_hidden_6=tf.keras.layers.Dense(1,activation='relu',use_bias='true')
+        absolute_state=tf.keras.Input(shape=(1,200))
+        value_hidden_1=tf.keras.layers.Dense(300,activation='relu',use_bias='true')(absolute_state)
+        value_hidden_2=tf.keras.layers.Dense(400,activation='relu',use_bias='true')(value_hidden_1)
+        value_hidden_3=tf.keras.layers.Dense(300,activation='relu',use_bias='true')(value_hidden_2)
+        value_hidden_4=tf.keras.layers.Dense(200,activation='relu',use_bias='true')(value_hidden_3)
+        value_hidden_5=tf.keras.layers.Dense(100,activation='relu',use_bias='true')(value_hidden_4)
+        value_hidden_6=tf.keras.layers.Dense(1,activation='relu',use_bias='true')(value_hidden_5)
+        self.value_model=tf.keras.Model(inputs=absolute_state,outputs=value_hidden_6)
         #value retention lists
         self.absolute_state_history=[]
         self.message_history_self=[np.zeros(100)]
@@ -452,35 +490,29 @@ class agentTwo():
         if x==0:
             self.external_message_history.append(messageTwo)
         
-        msg2_output=self.lstm_msg2(messageTwo)
-        msg4_output=self.lstm_msg4(messageFour)
-        board_output=self.lstm_board(boardState)
-        relation_output=self.lstm_relation(relationVal)
+        msg2_output=self.lstm_msg2_model(tensor_conversion(messageTwo,True))
+        msg4_output=self.lstm_msg4_model(tensor_conversion(messageFour,True))
+        board_output=self.lstm_board_model(tensor_conversion(boardState,True))
+        relation_output=self.lstm_relation_model(tensor_conversion(relationVal,True))
 
-        concat_state=np.concatenate((msg2_output,msg4_output,board_output,relation_output))
+        concat_state=np.concatenate((numpy_conversion(msg2_output),numpy_conversion(msg4_output),numpy_conversion(board_output),numpy_conversion(relation_output)))
 
-        ffn1=self.ffn_1(concat_state)
-        ffn2=self.ffn_2(ffn1)
-        ffn3=self.ffn_3(ffn2)
-        ffn4=self.ffn_4(ffn3)
-        state=self.ffn_5(ffn4)
+        state=self.ffn_model(tensor_conversion(concat_state,False))
+
+        state=numpy_conversion(state)
 
         self.absolute_state_history.append(state)
         return state
 
     def boardAction(self, state):
-        board1=self.board_hidden_1(state)
-        board2=self.board_hidden_2(board1)
-        board3=self.board_hidden_3(board2)
-        board4=self.board_hidden_4(board3)
-        board5=self.board_hidden_5(board4)
-        mean=self.board_mu(board5)
-        std=self.board_sigma(board5)
+        (mean,std)=self.board_model(tensor_conversion(state,False))
 
         norm_dist=tf.compat.v1.distributions.Normal(mean,std)
         action=tf.squeeze(norm_dist.sample(1),axis=0)
 
-        action=np.insert(nn8,0,2)
+        action=numpy_conversion(action)
+
+        action=np.insert(action,0,2)
 
         action[1]=np.round((5/(1+np.exp(-action[1]-5))))
         for x in range(len(action[2:])):
@@ -490,18 +522,12 @@ class agentTwo():
         return boardAction, norm_dist
         
     def messageAction(self, state):
-        msg1=self.message_hidden_1(state)
-        msg2=self.message_hidden_2(msg1)
-        msg3=self.message_hidden_3(msg2)
-        msg4=self.message_hidden_4(msg3)
-        msg5=self.message_hidden_5(msg4)
-        msg6=self.message_hidden_6(msg5)
-        msg7=self.message_hidden_7(msg6)
-        mean=self.message_mu(msg7)
-        std=self.message_sigma(msg7)
+        (mean,std)=self.message_model(tensor_conversion(state,False))
 
         norm_dist=tf.compat.v1.distributions.Normal(mean,std)
         message4=tf.squeeze(norm_dist.sample(1),axis=0)
+
+        message4=numpy_conversion(message4)
         
         messageAction=message4
         self.message_history_self.append(message4)
@@ -509,12 +535,8 @@ class agentTwo():
         return messageAction, norm_dist
     
     def stateValue(self, state):
-        val1=self.value_hidden_1(state)
-        val2=self.value_hidden_2(val1)
-        val3=self.value_hidden_3(val2)
-        val4=self.value_hidden_4(val3)
-        val5=self.value_hidden_5(val4)
-        value=self.value_hidden_6(val5)
+        value=self.value_model(tensor_conversion(state,False))
+        value=numpy_conversion(value)
         return value
 
     def updateParameters(self,oldAbsoluteState2,absoluteState2,reward):
@@ -530,41 +552,60 @@ class agentOne():
     def __init__(self):
         ####################################TENSORFLOW VARIABLES####################################
         #lstms
-        self.lstm_msg1=tf.keras.layers.LSTM(300,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)
-        self.lstm_msg3=tf.keras.layers.LSTM(300,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)
-        self.lstm_board=tf.keras.layers.LSTM(200,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)
-        self.lstm_relation=tf.keras.layers.LSTM(50,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)
+        msg1=tf.keras.Input(shape=(1,100))
+        lstm_msg1=tf.keras.layers.LSTM(300,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)(msg1)
+        self.lstm_msg1_model=tf.keras.Model(inputs=msg1,outputs=lstm_msg1)
+
+        msg3=tf.keras.Input(shape=(1,100))
+        lstm_msg3=tf.keras.layers.LSTM(300,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)(msg3)
+        self.lstm_msg3_model=tf.keras.Model(inputs=msg3,outputs=lstm_msg3)
+
+        board=tf.keras.Input(shape=(1,24))
+        lstm_board=tf.keras.layers.LSTM(200,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)(board)
+        self.lstm_board_model=tf.keras.Model(inputs=board,outputs=lstm_board)
+
+        relation=tf.keras.Input(shape=(1,1))
+        lstm_relation=tf.keras.layers.LSTM(50,activation='tanh',recurrent_activation='sigmoid',use_bias=True,unroll=False)(relation)
+        self.lstm_relation_model=tf.keras.Model(inputs=relation,outputs=lstm_relation)
         #ffns
-        self.ffn_1=tf.keras.layers.Dense(720,activation='relu',use_bias=True)
-        self.ffn_2=tf.keras.layers.Dense(590,activation='relu',use_bias=True)
-        self.ffn_3=tf.keras.layers.Dense(460,activation='relu',use_bias=True)
-        self.ffn_4=tf.keras.layers.Dense(330,activation='relu',use_bias=True)
-        self.ffn_5=tf.keras.layers.Dense(200,activation='relu',use_bias=True)
+        full_state=tf.keras.Input(shape=(1,850))
+        ffn_1=tf.keras.layers.Dense(720,activation='relu',use_bias=True)(full_state)
+        ffn_2=tf.keras.layers.Dense(590,activation='relu',use_bias=True)(ffn_1)
+        ffn_3=tf.keras.layers.Dense(460,activation='relu',use_bias=True)(ffn_2)
+        ffn_4=tf.keras.layers.Dense(330,activation='relu',use_bias=True)(ffn_3)
+        ffn_5=tf.keras.layers.Dense(200,activation='relu',use_bias=True)(ffn_4)
+        self.ffn_model=tf.keras.Model(inputs=full_state,outputs=ffn_5)
         #board policy ffns
-        self.board_hidden_1=tf.keras.layers.Dense(250,activation='relu',use_bias='true')
-        self.board_hidden_2=tf.keras.layers.Dense(200,activation='relu',use_bias='true')
-        self.board_hidden_3=tf.keras.layers.Dense(150,activation='relu',use_bias='true')
-        self.board_hidden_4=tf.keras.layers.Dense(100,activation='relu',use_bias='true')
-        self.board_hidden_5=tf.keras.layers.Dense(20,activation='relu',use_bias='true')
-        self.board_mu=tf.keras.layers.Dense(7,activation='relu',use_bias='true')
-        self.board_sigma=tf.keras.layers.Dense(7,activation='relu',use_bias='true')
+        absolute_state=tf.keras.Input(shape=(1,200))
+        board_hidden_1=tf.keras.layers.Dense(250,activation='relu',use_bias='true')(absolute_state)
+        board_hidden_2=tf.keras.layers.Dense(200,activation='relu',use_bias='true')(board_hidden_1)
+        board_hidden_3=tf.keras.layers.Dense(150,activation='relu',use_bias='true')(board_hidden_2)
+        board_hidden_4=tf.keras.layers.Dense(100,activation='relu',use_bias='true')(board_hidden_3)
+        board_hidden_5=tf.keras.layers.Dense(20,activation='relu',use_bias='true')(board_hidden_4)
+        board_mu=tf.keras.layers.Dense(7,activation='relu',use_bias='true')(board_hidden_5)
+        board_sigma=tf.keras.layers.Dense(7,activation='relu',use_bias='true')(board_hidden_5)
+        self.board_model=tf.keras.Model(inputs=absolute_state,outputs=[board_mu,board_sigma])
         #message policy ffns
-        self.message_hidden_1=tf.keras.layers.Dense(250,activation='relu',use_bias='true')
-        self.message_hidden_2=tf.keras.layers.Dense(300,activation='relu',use_bias='true')
-        self.message_hidden_3=tf.keras.layers.Dense(350,activation='relu',use_bias='true')
-        self.message_hidden_4=tf.keras.layers.Dense(300,activation='relu',use_bias='true')
-        self.message_hidden_5=tf.keras.layers.Dense(250,activation='relu',use_bias='true')
-        self.message_hidden_6=tf.keras.layers.Dense(200,activation='relu',use_bias='true')
-        self.message_hidden_7=tf.keras.layers.Dense(150,activation='relu',use_bias='true')
-        self.message_mu=tf.keras.layers.Dense(100,activation='relu',use_bias='true')
-        self.message_sigma=tf.keras.layers.Dense(100,activation='relu',use_bias='true')
+        absolute_state=tf.keras.Input(shape=(1,200))
+        message_hidden_1=tf.keras.layers.Dense(250,activation='relu',use_bias='true')(absolute_state)
+        message_hidden_2=tf.keras.layers.Dense(300,activation='relu',use_bias='true')(message_hidden_1)
+        message_hidden_3=tf.keras.layers.Dense(350,activation='relu',use_bias='true')(message_hidden_2)
+        message_hidden_4=tf.keras.layers.Dense(300,activation='relu',use_bias='true')(message_hidden_3)
+        message_hidden_5=tf.keras.layers.Dense(250,activation='relu',use_bias='true')(message_hidden_4)
+        message_hidden_6=tf.keras.layers.Dense(200,activation='relu',use_bias='true')(message_hidden_5)
+        message_hidden_7=tf.keras.layers.Dense(150,activation='relu',use_bias='true')(message_hidden_6)
+        message_mu=tf.keras.layers.Dense(100,activation='relu',use_bias='true')(message_hidden_7)
+        message_sigma=tf.keras.layers.Dense(100,activation='relu',use_bias='true')(message_hidden_7)
+        self.message_model=tf.keras.Model(inputs=absolute_state,outputs=[message_mu,message_sigma])
         #value function ffns
-        self.value_hidden_1=tf.keras.layers.Dense(300,activation='relu',use_bias='true')
-        self.value_hidden_2=tf.keras.layers.Dense(400,activation='relu',use_bias='true')
-        self.value_hidden_3=tf.keras.layers.Dense(300,activation='relu',use_bias='true')
-        self.value_hidden_4=tf.keras.layers.Dense(200,activation='relu',use_bias='true')
-        self.value_hidden_5=tf.keras.layers.Dense(100,activation='relu',use_bias='true')
-        self.value_hidden_6=tf.keras.layers.Dense(1,activation='relu',use_bias='true')
+        absolute_state=tf.keras.Input(shape=(1,200))
+        value_hidden_1=tf.keras.layers.Dense(300,activation='relu',use_bias='true')(absolute_state)
+        value_hidden_2=tf.keras.layers.Dense(400,activation='relu',use_bias='true')(value_hidden_1)
+        value_hidden_3=tf.keras.layers.Dense(300,activation='relu',use_bias='true')(value_hidden_2)
+        value_hidden_4=tf.keras.layers.Dense(200,activation='relu',use_bias='true')(value_hidden_3)
+        value_hidden_5=tf.keras.layers.Dense(100,activation='relu',use_bias='true')(value_hidden_4)
+        value_hidden_6=tf.keras.layers.Dense(1,activation='relu',use_bias='true')(value_hidden_5)
+        self.value_model=tf.keras.Model(inputs=absolute_state,outputs=value_hidden_6)
         #value retention lists
         self.absolute_state_history=[]
         self.message_history_self=[np.zeros(100)]
@@ -602,35 +643,29 @@ class agentOne():
         if x==0:
             self.external_message_history.append(messageOne)
 
-        msg1_output=self.lstm_msg1(messageOne)
-        msg3_output=self.lstm_msg3(messageThree)
-        board_output=self.lstm_board(boardState)
-        relation_output=self.lstm_relation(relationVal)
+        msg1_output=self.lstm_msg1_model(tensor_conversion(messageOne,True))
+        msg3_output=self.lstm_msg3_model(tensor_conversion(messageThree,True))
+        board_output=self.lstm_board_model(tensor_conversion(boardState,True))
+        relation_output=self.lstm_relation_model(tensor_conversion(relationVal,True))
 
-        concat_state=np.concatenate((msg1_output,msg3_output,board_output,relation_output))
+        concat_state=np.concatenate((numpy_conversion(msg1_output),numpy_conversion(msg3_output),numpy_conversion(board_output),numpy_conversion(relation_output)))
 
-        ffn1=self.ffn_1(concat_state)
-        ffn2=self.ffn_2(ffn1)
-        ffn3=self.ffn_3(ffn2)
-        ffn4=self.ffn_4(ffn3)
-        state=self.ffn_5(ffn4)
+        state=self.ffn_model(tensor_conversion(concat_state,False))
+
+        state=numpy_conversion(state)
 
         self.absolute_state_history.append(state)
         return state
 
     def boardAction(self, state):
-        board1=self.board_hidden_1(state)
-        board2=self.board_hidden_2(board1)
-        board3=self.board_hidden_3(board2)
-        board4=self.board_hidden_4(board3)
-        board5=self.board_hidden_5(board4)
-        mean=self.board_mu(board5)
-        std=self.board_sigma(board5)
+        (mean,std)=self.board_model(tensor_conversion(state,False))
 
         norm_dist=tf.compat.v1.distributions.Normal(mean,std)
         action=tf.squeeze(norm_dist.sample(1),axis=0)
 
-        action=np.insert(nn8,0,1)
+        action=numpy_conversion(action)
+
+        action=np.insert(action,0,1)
 
         action[1]=np.round((5/(1+np.exp(-action[1]-5))))
         for x in range(len(action[2:])):
@@ -640,18 +675,12 @@ class agentOne():
         return boardAction, norm_dist
         
     def messageAction(self, state):
-        msg1=self.message_hidden_1(state)
-        msg2=self.message_hidden_2(msg1)
-        msg3=self.message_hidden_3(msg2)
-        msg4=self.message_hidden_4(msg3)
-        msg5=self.message_hidden_5(msg4)
-        msg6=self.message_hidden_6(msg5)
-        msg7=self.message_hidden_7(msg6)
-        mean=self.message_mu(msg7)
-        std=self.message_sigma(msg7)
+        (mean,std)=self.message_model(tensor_conversion(state,False))
 
         norm_dist=tf.compat.v1.distributions.Normal(mean,std)
         message3=tf.squeeze(norm_dist.sample(1),axis=0)
+
+        message3=numpy_conversion(message3)
         
         messageAction=message3
         self.message_history_self.append(message3)
@@ -659,12 +688,8 @@ class agentOne():
         return messageAction, norm_dist
 
     def stateValue(self, state):
-        val1=self.value_hidden_1(state)
-        val2=self.value_hidden_2(val1)
-        val3=self.value_hidden_3(val2)
-        val4=self.value_hidden_4(val3)
-        val5=self.value_hidden_5(val4)
-        value=self.value_hidden_6(val5)
+        value=self.value_model(tensor_conversion(state,False))
+        value=numpy_conversion(value)
         return value
 
     def updateParameters(self,oldAbsoluteState1,absoluteState1,reward):
@@ -712,6 +737,7 @@ while True:
         oldStateValue1=agentOne.stateValue(oldAbsoluteState1)
         oldStateValue2=agentTwo.stateValue(oldAbsoluteState2)
         #update parameters and output relations
+        relations=agentThree.updateParameters(oldAbsoluteState3,absoluteState3,currentStateValue1,currentStateValue2,oldStateValue1,oldStateValue2,reward)
         print("agent 3 round done")
         
         ###AGENT ONE ROUND###
