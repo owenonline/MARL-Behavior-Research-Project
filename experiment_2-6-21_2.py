@@ -200,14 +200,16 @@ class agentThree():
         self.value_fn_params=np.random.normal(0,0.1,(1,363))
 
         #mean and standard deviation
-        self.board_policy_params=[np.random.normal(0,0.1,(318,363)),np.random.normal(0,0.1,(273,318)),np.random.normal(0,0.1,(228,273)),np.random.normal(0,0.1,(183,228)),np.random.normal(0,0.1,(138,183)),np.random.normal(0,0.1,(93,138)),np.random.normal(0,0.1,(48,93)),np.random.normal(0,0.1,(8,48))]
-        self.board_policy_std_params=[np.random.normal(0,0.1,(318,363)),np.random.normal(0,0.1,(273,318)),np.random.normal(0,0.1,(228,273)),np.random.normal(0,0.1,(183,228)),np.random.normal(0,0.1,(138,183)),np.random.normal(0,0.1,(93,138)),np.random.normal(0,0.1,(48,93)),np.random.normal(0,0.1,(8,48))]
-        self.board_policy_biases=[0,0,0,0,0,0,0,0]
-        self.board_policy_std_biases=[0,0,0,0,0,0,0,0]
+        self.board_policy_params=np.random.normal(0,0.1,(8,363))
+        self.board_policy_std_params=np.random.normal(0,0.1,(8,363))
+        self.board_policy_biases=0
+        self.board_policy_std_biases=0
         self.board_policy_backprop_info=[]
         
-        self.msg_policy_params=[np.random.normal(0,0.1,(343,363)),np.random.normal(0,0.1,(323,343)),np.random.normal(0,0.1,(303,323)),np.random.normal(0,0.1,(283,303)),np.random.normal(0,0.1,(243,283)),np.random.normal(0,0.1,(223,243)),np.random.normal(0,0.1,(203,223)),np.random.normal(0,0.1,(200,203))]
-        self.msg_policy_biases=[0,0,0,0,0,0,0,0]
+        self.msg_policy_params=np.random.normal(0,0.1,(200,363))
+        self.msg_policy_std_params=np.random.normal(0,0.1,(200,363))
+        self.msg_policy_biases=0
+        self.msg_policy_std_biases=0
         self.msg_policy_backprop_info=[]
 
         #the following three lists hold first every absolute state that the agent takes an action from, second every message the agent generates, and third every action the agent takes. They go by time step
@@ -222,6 +224,8 @@ class agentThree():
         self.generalReward_history=[]
         self.totalSpeakingReward_history=[]
         self.totalListeningReward_history=[]
+
+        self.I=1
         
     def stateConcatThree(self, fullState):
         reward=fullState[2]
@@ -271,15 +275,7 @@ class agentThree():
         return self.ffn_outputs[1]
 
     def boardAction(self):
-        #363->318->273->228->183->138->93->48->8
-        nn1=swish(np.matmul(self.board_policy_params[0],self.ffn_outputs[1])+self.board_policy_biases[0])
-        nn2=swish(np.matmul(self.board_policy_params[1],nn1)+self.board_policy_biases[1])
-        nn3=swish(np.matmul(self.board_policy_params[2],nn2)+self.board_policy_biases[2])
-        nn4=swish(np.matmul(self.board_policy_params[3],nn3)+self.board_policy_biases[3])
-        nn5=swish(np.matmul(self.board_policy_params[4],nn4)+self.board_policy_biases[4])
-        nn6=swish(np.matmul(self.board_policy_params[5],nn5)+self.board_policy_biases[5])
-        nn7=swish(np.matmul(self.board_policy_params[6],nn6)+self.board_policy_biases[6])
-        nn8=swish(np.matmul(self.board_policy_params[7],nn7)+self.board_policy_biases[7])
+        nn8=np.matmul(self.board_policy_params,self.ffn_outputs[1])+self.board_policy_biases
         orig_nn8=nn8
         if nn8[0]>-1.5:
             nn8[0]=-1
@@ -289,24 +285,16 @@ class agentThree():
         for x in range(len(nn8[2:])):
             nn8[x+2]=np.round((4/(1+np.exp(-(nn8[1]-4))))-2)
         boardAction=[nn8[0],nn8[1],nn8[2:]]
-        self.board_policy_backprop_info=[nn1,nn2,nn3,nn4,nn5,nn6,nn7,orig_nn8]
+        self.board_policy_backprop_info=orig_nn8
         self.action_history_self.append(nn8)
         return boardAction
 
     def messageAction(self):
-        #363->343->323->303->283->243->223->203->200
-        nn1=swish(np.matmul(self.msg_policy_params[0],self.ffn_outputs[1])+self.msg_policy_biases[0])
-        nn2=swish(np.matmul(self.msg_policy_params[1],nn1)+self.msg_policy_biases[1])
-        nn3=swish(np.matmul(self.msg_policy_params[2],nn2)+self.msg_policy_biases[2])
-        nn4=swish(np.matmul(self.msg_policy_params[3],nn3)+self.msg_policy_biases[3])
-        nn5=swish(np.matmul(self.msg_policy_params[4],nn4)+self.msg_policy_biases[4])
-        nn6=swish(np.matmul(self.msg_policy_params[5],nn5)+self.msg_policy_biases[5])
-        nn7=swish(np.matmul(self.msg_policy_params[6],nn6)+self.msg_policy_biases[6])
-        nn8=swish(np.matmul(self.msg_policy_params[7],nn7)+self.msg_policy_biases[7])
+        nn8=np.matmul(self.msg_policy_params,self.ffn_outputs[1])+self.msg_policy_biases
         message1=nn8[0:100]
         message2=nn8[100:200]
         messageAction=[message1,message2]
-        self.msg_policy_backprop_info=[nn1,nn2,nn3,nn4,nn5,nn6,nn7,nn8]
+        self.msg_policy_backprop_info=[nn8]
         self.message_history_self.append(nn8)
         return messageAction
 
@@ -343,15 +331,60 @@ class agentThree():
         ##This code calculates the value of the current state
         currentStateValue3=np.matmul(self.value_fn_params,absoluteState3)
         oldStateValue3=np.matmul(self.value_fn_params,oldAbsoluteState3)
+
+        
         ##This code calculates the value function error, which is important in getting the error of the other states. It also updates the value function
         valueDiscount=0.1
         stepSizeValue=0.1
         valueError=totalRewardAvg+(0.1*currentStateValue3)-oldStateValue3
         self.value_fn_params=self.value_fn_params+stepSizeValue*valueError*oldAbsoluteState3
-        ##This code calculates the new values for the board policy
+        
+        ####This code calculates the new values for the board policy####
+        stepSizeBoard=0.1
+        standard_deviation_board=[math.exp(y) for y in np.matmul(self.board_policy_std_params,oldAbsoluteState3)]
+        mean_board=self.board_policy_backprop_info
+        ##
+        p1=[1/x**2 for x in standard_deviation_board]
+        p2=[stepSizeBoard-x for x in mean_board]
+        #this should result in a vector of size (1,8) becacuse it has to be multiplied by a 363,1 vector to result in a 363,8. That means it's elementwise
+        p3=np.multiply(p1,p2)
+        p4=np.matmul(p3,oldAbsoluteState3)
+        gradient_mean_board=p4
+        ##
+        ##
+        p1=p1 #this stays the same from the other part
+        p2=[x**2 for x in p2]
+        p3=np.multiply(p1,p2)
+        p4=[x-1 for x in p3]
+        p5=np.matmul(p4,oldAbsoluteState3)
+        gradient_std_board=p5
+        ##
+        self.board_policy_params=self.board_policy_params+np.multiply((stepSizeBoard*self.I*valueError),gradient_mean_board)
+        self.board_policy_std_params=self.board_policy_std_params+np.multiply((stepSizeBoard*self.I*valueError),gradient_std_board)
         
         ##This code calculates the new values for the message policy
-
+        stepSizeMessage=0.1
+        standard_deviation_message=np.matmul(self.message_policy_std_params,oldAbsoluteState3)
+        mean_message=self.message_policy_backprop_info
+        ##
+        p1=[1/x**2 for x in standard_deviation_message]
+        p2=[stepSizeBoard-x for x in mean_message]
+        p3=np.multiply(p1,p2)
+        p4=np.matmul(p3,oldAbsoluteState3)
+        gradient_mean_message=p4
+        ##
+        ##
+        p1=p1 #this stays the same from the other part
+        p2=[x**2 for x in p2]
+        p3=np.multiply(p1,p2)
+        p4=[x-1 for x in p3]
+        p5=np.matmul(p4,oldAbsoluteState3)
+        gradient_std_messagee=p5
+        ##
+        self.message_policy_params=self.board_policy_params+np.multiply((stepSizeMessage*self.I*valueError),gradient_mean_message)
+        self.message_policy_std_params=self.board_policy_std_params+np.multiply((stepSizeMessage*self.I*valueError),gradient_std_message)
+        
+        self.I=I*valueDiscount
         ##This code does gradient passing back to the FFN's
         
         
@@ -638,7 +671,7 @@ oldStateValue2=agentTwo.stateValue(oldAbsoluteState2)
 #now im at the point where I can finally write the most difficult method of the whole program
 
 ###AGENT ONE ROUND###
-checkers.updateState(relationVals)
+#checkers.updateState(relationVals)
 absoluteState3=agentThree.stateConcatThree(fullState)
 absoluteState2=agentTwo.stateConcatTwo(fullState)
 absoluteState1=agentOne.stateConcatOne(fullState)
