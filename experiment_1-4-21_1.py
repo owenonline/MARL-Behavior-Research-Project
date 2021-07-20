@@ -12,13 +12,14 @@ class checkersEnvironment():
         #reward is a 3x3 matrix. The first row is the message reward (based on how much the messages relate to the actions taken), the second row is the board reward (based on the legal movement of pieces; >=0), the third is general reward (based on winning or losing the game)
         reward=[[0,0,0],[0,0,0],[0,0,0]]
         #messages is a vector for 4 messages of length 0-100. message 1 is from agent 3 to agent 1, message 2 is from agent 3 to agent 2, message 3 is from agent 1 to agent 3, and message 4 is from agent 2 to agent 3
-        messages=[0,0,0,0]
+        messages=[list(0 for x in range(100)),list(0 for x in range(100)),list(0 for x in range(100)),list(0 for x in range(100))]
         relationVals=[0,0]
+        #(y,x)
         boardState=[[[2,1],[1,2],[2,3],[1,4],[2,5],[1,6]],[[6,1],[5,2],[6,3],[5,4],[6,5],[5,6]]]
         isTerminal=False
         self.fullState=(reward,boardState,isTerminal,messages,relationVals)
         return self.fullState[1]
-    
+            
     def envStepBoard(self,action,piece,agentReal):
         #agentReal=-1, -2, 1, or 2 to represent either agent 1, agent 2, or either agent but selected by agent 3 (the negative values). This is normalized to a binary value for the purpose of determining move legality.
         agent=abs(agentReal)-1
@@ -98,5 +99,56 @@ class checkersEnvironment():
     def envStepMessage(self, messages, action, agentReal, piece):
         #use RIAL to determine message reward
 
+
+class agentThree():
+    def __init__(self):
+        lstm_msg1_params=[]
+        lstm_msg2_params=[]
+        lstm_msg3_params=[]
+        lstm_msg4_params=[]
+        msg_ffn_params=[]
+        value_fn_params=[]
+        board_policy_params=[]
+        msg_policy_params=[]
+        
+    def stateConcatThree(fullState):
+        
+
+class agentTwo():
+    def __init__(self):
+        lstm_msg1_params=[]
+        lstm_msg2_params=[]
+        lstm_msg3_params=[]
+        lstm_msg4_params=[]
+        msg_ffn_params=[]
+        value_fn_params=[]
+        board_policy_params=[]
+        msg_policy_params=[]
+        
+    def stateConcatTwo(fullState):
+        
+
+class agentOne():
+    def __init__(self):
+        lstm_msg1_params=[]
+        lstm_msg2_params=[]
+        lstm_msg3_params=[]
+        lstm_msg4_params=[]
+        msg_ffn_params=[]
+        value_fn_params=[]
+        board_policy_params=[]
+        msg_policy_params=[]
+        
+    def stateConcatOne(fullState):
+
+def main():
+    checkers=checkersEnvironment()
+    agentOne=agentOne()
+    agentTwo=agentTwo()
+    agentThree=agentThree()
+    
+    checkers.envInit()
+    checkers.envStart()
+    
 
 
