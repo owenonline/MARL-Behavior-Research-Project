@@ -198,9 +198,12 @@ class agentThree():
         self.ffn_outputs=[[],[]]
         
         self.value_fn_params=np.random.normal(0,0.1,(1,363))
-        
+
+        #mean and standard deviation
         self.board_policy_params=[np.random.normal(0,0.1,(318,363)),np.random.normal(0,0.1,(273,318)),np.random.normal(0,0.1,(228,273)),np.random.normal(0,0.1,(183,228)),np.random.normal(0,0.1,(138,183)),np.random.normal(0,0.1,(93,138)),np.random.normal(0,0.1,(48,93)),np.random.normal(0,0.1,(8,48))]
+        self.board_policy_std_params=[np.random.normal(0,0.1,(318,363)),np.random.normal(0,0.1,(273,318)),np.random.normal(0,0.1,(228,273)),np.random.normal(0,0.1,(183,228)),np.random.normal(0,0.1,(138,183)),np.random.normal(0,0.1,(93,138)),np.random.normal(0,0.1,(48,93)),np.random.normal(0,0.1,(8,48))]
         self.board_policy_biases=[0,0,0,0,0,0,0,0]
+        self.board_policy_std_biases=[0,0,0,0,0,0,0,0]
         self.board_policy_backprop_info=[]
         
         self.msg_policy_params=[np.random.normal(0,0.1,(343,363)),np.random.normal(0,0.1,(323,343)),np.random.normal(0,0.1,(303,323)),np.random.normal(0,0.1,(283,303)),np.random.normal(0,0.1,(243,283)),np.random.normal(0,0.1,(223,243)),np.random.normal(0,0.1,(203,223)),np.random.normal(0,0.1,(200,203))]
@@ -214,6 +217,11 @@ class agentThree():
 
         #this holds the messages of the other agents
         self.external_message_history=[]
+
+        self.boardReward_history=[]
+        self.generalReward_history=[]
+        self.totalSpeakingReward_history=[]
+        self.totalListeningReward_history=[]
         
     def stateConcatThree(self, fullState):
         reward=fullState[2]
@@ -301,6 +309,50 @@ class agentThree():
         self.msg_policy_backprop_info=[nn1,nn2,nn3,nn4,nn5,nn6,nn7,nn8]
         self.message_history_self.append(nn8)
         return messageAction
+
+    def updateParameters(oldAbsoluteState3,absoluteState3,currentStateValue1,currentStateValue2,oldStateValue1,oldStateValue2,reward):
+        ##This code adds the relation values to the general reward
+        (boardReward,generalReward,totalSpeakingReward,totalListeningReward)=reward
+        relations=checkers.fullState[-1]
+        #relation discounting amount
+        discountFactor=0.1
+        relations[0]+=(currentStateValue1-oldStateValue1)*discountFactor
+        relations[1]+=(currentStateValue2-oldStateValue2)*discountFactor
+        if (relations[0]-checkers.fullState[-1][0]) < (relations[0]-checkers.fullState[-1][0]):
+            generalReward+=relations[0]-checkers.fullState[-1][0]
+        else:
+            generalReward+=relations[1]-checkers.fullState[-1][1]
+
+        ##This code regularizes the reward:
+        self.boardReward_history.append(boardReward)
+        self.generalReward_history.append(generalReward)
+        self.totalSpeakingReward_history.append(totalSpeakingReward)
+        self.totalListeningReward_history.append(totalListeningReward)
+
+        boardRewardAvg=sum(self.boardReward_history)/len(self.boardReward_history)
+        boardRewardRegularized=boardReward/boardRewardAvg
+        generalRewardAvg=sum(self.generalReward_history)/len(self.generalReward_history)
+        generalRewardRegularized=generalReward/generalRewardAvg
+        totalSpeakingRewardAvg=sum(self.totalSpeakingReward_history)/len(self.totalSpeakingReward_history)
+        totalSpeakingRewardRegularized=totalSpeakingReward/totalSpeakingRewardAvg
+        totalListeningRewardAvg=sum(self.totalListeningReward_history)/len(self.totalListeningReward_history)
+        totalListeningRewardRegularized=totalListeningReward/totalListeningRewardAvg
+
+        ##This code amalgamates the reward into one value:
+        totalRewardAvg=(boardRewardRegularized+generalRewardRegularized+totalSpeakingRewardRegularized+totalListeningRewardRegularized)/4
+        ##This code calculates the value of the current state
+        currentStateValue3=np.matmul(self.value_fn_params,absoluteState3)
+        oldStateValue3=np.matmul(self.value_fn_params,oldAbsoluteState3)
+        ##This code calculates the value function error, which is important in getting the error of the other states. It also updates the value function
+        valueDiscount=0.1
+        stepSizeValue=0.1
+        valueError=totalRewardAvg+(0.1*currentStateValue3)-oldStateValue3
+        self.value_fn_params=self.value_fn_params+stepSizeValue*valueError*oldAbsoluteState3
+        ##This code calculates the new values for the board policy
+        
+        ##This code calculates the new values for the message policy
+
+        ##This code does gradient passing back to the FFN's
         
         
 class agentTwo():
