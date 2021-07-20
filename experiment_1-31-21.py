@@ -154,11 +154,27 @@ class checkersEnvironment():
             totalListeningReward=totalListeningReward+(-np.absolute(actionDiff-msgDiff)*lambdaVar)
         totalListeningReward=totalListeningReward/len(externalMessageHistory)
         return (totalSpeakingReward, totalListeningReward)
-        print("Not yet implemented")
 
-    def prepNewState(self,messageAction,currentState,absoluteState1,absoluteState2,absoluteState3):
-        self.fullState=
-        print("Not yet implemented")
+    def prepNewState(self,messageAction,isTerminalNew,rewardNew,currentState,absoluteState1,absoluteState2,absoluteState3,agent):
+        [reward,boardState,isTerminal,messages,relationVals]=self.fullState
+        boardState=currentState
+        isTerminal=isTerminalNew
+        [a,b,c,d]=messages
+        if agent==3:
+            reward[2]=rewardNew
+            [a,b]=messageAction
+        if agent==1:
+            reward[0]=rewardNew
+            c=messageAction
+        if agent==2:
+            reward[1]=rewardNew
+            d=messageAction
+        messages=[a,b,c,d]
+        self.fullState=[reward,boardState,isTerminal,messages,relationVals]
+        oldAbsoluteState1=absoluteState1
+        oldAbsoluteState2=absoluteState2
+        oldAbsoluteState3=absoluteState3
+        return (oldAbsoluteState1,oldAbsoluteState2,oldAbsoluteState3, self.fullState)
 
 
 class agentThree():
@@ -197,7 +213,7 @@ class agentThree():
         self.external_message_history=[]
         
     def stateConcatThree(self, fullState):
-        reward=fullState[0]
+        reward=fullState[2]
         boardState=fullState[1]
         temp=[]
         for x in boardState:
@@ -439,7 +455,7 @@ class agentOne():
 
         
     def stateConcatOne(self, fullState):
-        reward=fullState[0]
+        reward=fullState[1]
         boardState=fullState[1]
         temp=[]
         for x in boardState:
@@ -538,4 +554,11 @@ messageAction=agentThree.messageAction()
 
 (currentState, isTerminal, boardReward, generalReward)=checkers.envStepBoard(boardAction)
 (totalSpeakingReward, totalListeningReward)=checkers.envStepMessage(agentThree.absolute_state_history,agentThree.message_history_self,agentThree.action_history_self)
-(oldAbsoluteState1,oldAbsoluteState2,oldAbsoluteState3, fullState)=checkers.prepNewState(messageAction,currentState,absoluteState1,absoluteState2,absoluteState3)
+#the one is a hacky solution for knowing what messages to replace. in this case it says that it's agent 1's turn to act
+reward=[boardReward,generalReward,totalSpeakingReward,totalListeningReward]
+(oldAbsoluteState1,oldAbsoluteState2,oldAbsoluteState3, fullState)=checkers.prepNewState(messageAction,isTerminal,reward,currentState,absoluteState1,absoluteState2,absoluteState3,1)
+absoluteState3=agentThree.stateConcatThree(fullState)
+absoluteState2=agentTwo.stateConcatTwo(fullState)
+absoluteState1=agentOne.stateConcatOne(fullState)
+#at this point I need to whip out the machine learning textbook and dust it off and re-learn how to use function approximation for a state value function
+#then, I need to dust off my designer thinking cap and get to work learning how to do back propogation on the value function and um uh hmm uh policy function
