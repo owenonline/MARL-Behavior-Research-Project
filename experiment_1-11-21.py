@@ -1,8 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plot
 import os
-from rl_glue import RLGlue
-from tqdm import tqdm
 import numpy as np
 import math
 from random import randint
@@ -17,13 +15,14 @@ def relu(X):
 def tanh(X):
     return np.tanh(X)
 
-
-#softmax activation
 def softmax(X):
     exp_X = np.exp(X)
     exp_X_sum = np.sum(exp_X,axis=1).reshape(-1,1)
     exp_X = exp_X/exp_X_sum
     return exp_X
+
+def swish(X):
+    return X/(1+np.exp(-X))
 
 #derivative of tanh
 def tanh_derivative(X):
@@ -122,9 +121,6 @@ class checkersEnvironment():
 
         return (currentState, isTerminal, boardReward, generalReward)
 
-    def envStepMessage(self, messages, action, agentReal, piece):
-        #use RIAL to determine message reward
-
 
 class agentThree():
     def __init__(self):
@@ -140,11 +136,18 @@ class agentThree():
         
         #ffn is gonna have 2 layers each with relu that cut the length down. 1450->725->363
         self.ffn_params=[np.random.normal(0,0.1,(725,1450)),np.random.normal(0,0.1,(363,725))]
+        self.ffn_biases=[0,0]
         self.ffn_outputs=[[],[]]
         
         self.value_fn_params=[]
-        self.board_policy_params=[]
-        self.msg_policy_params=[]
+        
+        self.board_policy_params=[np.random.normal(0,0.1,(318,363)),np.random.normal(0,0.1,(273,318)),np.random.normal(0,0.1,(228,273)),np.random.normal(0,0.1,(183,228)),np.random.normal(0,0.1,(138,183)),np.random.normal(0,0.1,(93,138)),np.random.normal(0,0.1,(48,93)),np.random.normal(0,0.1,(8,48))]
+        self.board_policy_biases=[0,0,0,0,0,0,0,0,0]
+        self.board_policy_backprop_info=[]
+        
+        self.msg_policy_params=[np.random.normal(0,0.1,(343,363)),np.random.normal(0,0.1,(323,343)),np.random.normal(0,0.1,(303,323)),np.random.normal(0,0.1,(283,303)),np.random.normal(0,0.1,(243,283)),np.random.normal(0,0.1,(223,243)),np.random.normal(0,0.1,(203,223)),np.random.normal(0,0.1,(200,203))]
+        self.msg_policy_biases=[0,0,0,0,0,0,0,0,0]
+        self.msg_policy_backprop_info=[]
         
     def stateConcatThree(fullState):
         reward=fullState[0]
@@ -186,14 +189,47 @@ class agentThree():
             self.lstm_recursive_info[x][1]=am
 
         absolute_state=np.concatenate((self.lstm_recursive_info[0][1],self.lstm_recursive_info[1][1],self.lstm_recursive_info[2][1],self.lstm_recursive_info[3][1],self.lstm_recursive_info[4][1],self.lstm_recursive_info[5][1]))
-        self.ffn_outputs[0]=relu(np.matmul(self.ffn_params[0],absolute_state))
-        self.ffn_outputs[1]=relu(np.matmul(self.ffn_params[1],self.ffn_outputs[0]))
+        self.ffn_outputs[0]=relu(np.matmul(self.ffn_params[0],absolute_state)+self.ffn_biases[0])
+        self.ffn_outputs[1]=relu(np.matmul(self.ffn_params[1],self.ffn_outputs[0])+self.ffn_biases[1])
         #ffn_2 is the networks perception of the state distilled from memory and feed forward layers
         return self.ffn_outputs[1]
 
     def boardAction(self):
-        #takes 363 length absolute state vector to produce board action
-        #the output has to be 8 long
+        #363->318->273->228->183->138->93->48->8
+        nn1=swish(np.matmul((self.board_policy_params[0],self.ffn_outputs[1])))
+        nn2=swish(np.matmul((self.board_policy_params[1],nn1)))
+        nn3=swish(np.matmul((self.board_policy_params[2],nn2)))
+        nn4=swish(np.matmul((self.board_policy_params[3],nn3)))
+        nn5=swish(np.matmul((self.board_policy_params[4],nn4)))
+        nn6=swish(np.matmul((self.board_policy_params[5],nn5)))
+        nn7=swish(np.matmul((self.board_policy_params[6],nn6)))
+        nn8=swish(np.matmul((self.board_policy_params[7],nn7)))
+        orig_nn8=nn8
+        if nn8[0]>-1.5:
+            nn8[0]=-1
+        else:
+            nn8[0]=-2
+        nn8[1]=np.round((5/(1+np.exp(-nn8[1]-5))))
+        for x in range(len(nn8[2:])):
+            nn8[x+2]=np.round((4/(1+np.exp(-(nn8[1]-4))))-2)
+        boardAction=[nn8[0],nn8[1],nn8[2:]]
+        self.board_policy_backprop_info=[nn1,nn2,nn3,nn4,nn5,nn6,nn7,orig_nn8]
+        return boardAction
+
+    def messageAction(self):
+        #363->343->323->303->283->243->223->203->200
+        nn1=swish(np.matmul((self.msg_policy_params[0],self.ffn_outputs[1])))
+        nn2=swish(np.matmul((self.msg_policy_params[1],nn1)))
+        nn3=swish(np.matmul((self.msg_policy_params[2],nn2)))
+        nn4=swish(np.matmul((self.msg_policy_params[3],nn3)))
+        nn5=swish(np.matmul((self.msg_policy_params[4],nn4)))
+        nn6=swish(np.matmul((self.msg_policy_params[5],nn5)))
+        nn7=swish(np.matmul((self.msg_policy_params[6],nn6)))
+        nn8=swish(np.matmul((self.msg_policy_params[7],nn7)))
+        message1=nn8[0:99]
+        message2=nn8[100:199]
+        messageAction=[message1,message2]
+        return messageAction
         
         
 class agentTwo():
@@ -210,6 +246,7 @@ class agentTwo():
 
         #ffn is gonna have 2 layers each with relu that cut the length down. 850->425->200
         self.ffn_params=[np.random.normal(0,0.1,(425,850)),np.random.normal(0,0.1,(200,425))]
+        self.ffn_biases=[0,0]
         self.ffn_outputs=[[],[]]
         
         self.value_fn_params=[]
@@ -255,8 +292,8 @@ class agentTwo():
             self.lstm_recursive_info[x][1]=am
 
         absolute_state=np.concatenate((self.lstm_recursive_info[0][1],self.lstm_recursive_info[1][1],self.lstm_recursive_info[2][1],self.lstm_recursive_info[3][1]))
-        self.ffn_outputs[0]=relu(np.matmul(self.ffn_params[0],absolute_state))
-        self.ffn_outputs[1]=relu(np.matmul(self.ffn_params[1],self.ffn_outputs[0]))
+        self.ffn_outputs[0]=relu(np.matmul(self.ffn_params[0],absolute_state)+self.ffn_biases[0])
+        self.ffn_outputs[1]=relu(np.matmul(self.ffn_params[1],self.ffn_outputs[0])+self.ffn_biases[1])
         #ffn_2 is the networks perception of the state distilled from memory and feed forward layers
         return self.ffn_outputs[1]
 
@@ -275,6 +312,7 @@ class agentOne():
 
         #ffn is gonna have 2 layers each with relu that cut the length down. 850->425->200
         self.ffn_params=[np.random.normal(0,0.1,(425,850)),np.random.normal(0,0.1,(200,425))]
+        self.ffn_biases=[0,0]
         self.ffn_outputs=[[],[]]
         
         self.value_fn_params=[]
@@ -320,8 +358,8 @@ class agentOne():
             self.lstm_recursive_info[x][1]=am
 
         absolute_state=np.concatenate((self.lstm_recursive_info[0][1],self.lstm_recursive_info[1][1],self.lstm_recursive_info[2][1],self.lstm_recursive_info[3][1]))
-        self.ffn_outputs[0]=relu(np.matmul(self.ffn_params[0],absolute_state))
-        self.ffn_outputs[1]=relu(np.matmul(self.ffn_params[1],self.ffn_outputs[0]))
+        self.ffn_outputs[0]=relu(np.matmul(self.ffn_params[0],absolute_state)+self.ffn_biases[0])
+        self.ffn_outputs[1]=relu(np.matmul(self.ffn_params[1],self.ffn_outputs[0])+self.ffn_biases[1])
         #ffn_2 is the networks perception of the state distilled from memory and feed forward layers
         return self.ffn_outputs[1]
 
@@ -334,9 +372,13 @@ def main():
     
     checkers.envInit()
     fullState=checkers.envStart()
+    
     absoluteState3=agentThree.stateConcatThree(fullState)
     absoluteState2=agentTwo.stateConcatTwo(fullState)
     absoluteState1=agentOne.stateConcatOne(fullState)
+
+    boardAction=agentThree.boardAction()
+    messageAction=agentThree.messageAction()
 
 main()
     
