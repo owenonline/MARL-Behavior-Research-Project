@@ -298,6 +298,8 @@ class agentThree():
         self.absolute_state_history=[]
         self.message_history_self=[np.zeros(200)]
         self.action_history_self=[np.zeros(8)]
+        self.orig_action_history=[]
+        self.orig_message_history=[]
         self.msgStateHistory=[]
         self.external_message_history=[]
         self.boardReward_history=[]
@@ -356,6 +358,8 @@ class agentThree():
         norm_dist=tf.compat.v1.distributions.Normal(mean,std)
         action=tf.squeeze(norm_dist.sample(1),axis=0)
 
+        self.orig_action_history.append(action)
+
         action=numpy_conversion(action)
         
         if action[0]>-1.5:
@@ -376,6 +380,8 @@ class agentThree():
         norm_dist=tf.compat.v1.distributions.Normal(mean,std)
         messages=tf.squeeze(norm_dist.sample(1),axis=0)
 
+        self.orig_message_history.append(messages)
+        
         messages=numpy_conversion(messages)
         
         message1=messages[0:100]
@@ -391,7 +397,7 @@ class agentThree():
         value=numpy_conversion(value)
         return value
 
-    def updateParameters(self,oldAbsoluteState3,absoluteState3,currentStateValue1,currentStateValue2,oldStateValue1,oldStateValue2,reward):
+    def updateParameters(self,oldAbsoluteState3,absoluteState3,currentStateValue1,currentStateValue2,oldStateValue1,oldStateValue2,reward,action,message,normdist_board,normdist_message):
         ####This code adds the relation values to the general reward####
         (boardReward,generalReward,totalSpeakingReward,totalListeningReward)=reward
         relations=checkers.fullState[-1]
@@ -414,14 +420,51 @@ class agentThree():
         overall_board_reward=boardReward+generalReward
         overall_message_reward=generalReward+totalSpeakingReward+totalListeningReward
 
-        value_error=overall_reward+(self.lambda_val*stateValue(absoluteState3))-stateValue(absoluteState3)
-        value_error_board=overall_board_reward+(self.lambda_val*stateValue(absoluteState3))-stateValue(absoluteState3)
-        value_error_message=overall_message_reward+(self.lambda_val*stateValue(absoluteState3))-stateValue(absoluteState3)
-        loss_board=self.board_lr*value_error_board*
-        loss_message=""
+        value_error_target=overall_reward+(self.lambda_val*self.stateValue(absoluteState3))
+        value_error_overall=(overall_reward+(self.lambda_val*self.stateValue(absoluteState3)))-self.stateValue(oldAbsoluteState3)
+        value_error_board=(overall_board_reward+(self.lambda_val*self.stateValue(absoluteState3)))-self.stateValue(oldAbsoluteState3)
+        value_error_message=(overall_message_reward+(self.lambda_val*self.stateValue(absoluteState3)))-self.stateValue(oldAbsoluteState3)
+
+        #action=tensor_conversion(action,False)
+        #message=tensor_conversion(message,False)
+        #value_error_target=tensor_conversion(value_error_target,False)
+        #value_error_overall=tensor_conversion(value_error_overall,False)
+        #value_error_board=tensor_conversion(value_error_board,False)
+        #value_error_mesage=tensor_conversion(value_error_mesage,False)
+
+        loss_board=-tf.math.log(normdist_board.prob(self.orig_action_history[-1])+1e-5)*value_error_board
+        loss_message=-tf.math.log(normdist_message.prob(self.orig_message_history[-1])+1e-5)*value_error_message
+        loss_critic=tf.math.reduce_mean(tf.math.squared_difference(tensor_conversion(self.stateValue(oldAbsoluteState3),False),value_error_target))
 
         with tf.GradientTape() as tape:
-            #do some cool stuff here
+            board_grads=tape.gradient(loss_board,self.board_model.trainable_variables)
+            message_grads=tape.gradient(loss_message,self.message_model.trainable_variables)
+            critic_grads=tape.gradient(loss_critic,self.value_model.trainable_variables)
+            ffn_grads=tape.gradient(critic_grads,self.ffn_model.trainable_variables)
+
+            msg1_in=ffn_grads[-1450:-1150]
+            msg1_grads=tape.gradient(msg1_in,self.lstm_msg1_model.trainable_variables)
+            msg2_in=ffn_grads[-1150:-850]
+            msg2_grads=tape.gradient(msg2_in,self.lstm_msg2_model.trainable_variables)
+            msg3_in=ffn_grads[-850:-550]
+            msg3_grads=tape.gradient(msg3_in,self.lstm_msg3_model.trainable_variables)
+            msg4_in=ffn_grads[-550:-250]
+            msg4_grads=tape.gradient(msg4_in,self.lstm_msg4_model.trainable_variables)
+            board_in=ffn_grads[-250:-50]
+            board_lstm_grads=tape.gradient(board_in,self.lstm_board_model.trainable_variables)
+            relation_in=ffn_grads[-50:]
+            relation_grads=tape.gradient(relation_in,self.lstm_relation_model.trainable_variables)
+
+            self.optimizer.apply_gradients(zip(board_grads,self.board_model.trainable_variables))
+            self.optimizer.apply_gradients(zip(message_grads,self.message_model.trainable_variables))
+            self.optimizer.apply_gradients(zip(critic_grads,self.value_model.trainable_variables))
+            self.optimizer.apply_gradients(zip(ffn_grads,self.ffn_model.trainable_variables))
+            self.optimizer.apply_gradients(zip(msg1_grads,self.lstm_msg1_model.trainable_variables))
+            self.optimizer.apply_gradients(zip(msg2_grads,self.lstm_msg2_model.trainable_variables))
+            self.optimizer.apply_gradients(zip(msg3_grads,self.lstm_msg3_model.trainable_variables))
+            self.optimizer.apply_gradients(zip(msg4_grads,self.lstm_msg4_model.trainable_variables))
+            self.optimizer.apply_gradients(zip(board_lstm_grads,self.lstm_board_model.trainable_variables))
+            self.optimizer.apply_gradients(zip(relation_grads,self.lstm_relation_model.trainable_variables))
 
         return relations
         
@@ -761,7 +804,7 @@ while True:
         oldStateValue1=agentOne.stateValue(oldAbsoluteState1)
         oldStateValue2=agentTwo.stateValue(oldAbsoluteState2)
         #update parameters and output relations
-        relations=agentThree.updateParameters(oldAbsoluteState3,absoluteState3,currentStateValue1,currentStateValue2,oldStateValue1,oldStateValue2,reward)
+        relations=agentThree.updateParameters(oldAbsoluteState3,absoluteState3,currentStateValue1,currentStateValue2,oldStateValue1,oldStateValue2,reward,boardAction,messageAction,normDistBoard,normDistMessage)
         print("agent 3 round done")
         
         ###AGENT ONE ROUND###
