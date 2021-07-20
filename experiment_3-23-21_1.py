@@ -1,44 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plot
-import os
-import numpy as np
-import math
-from random import randint
-import csv
 import tensorflow as tf
-
-#Activation Functions
-def sigmoid(X):
-    return 1/(1+np.exp(-X))
-
-def relu(X):
-    return np.maximum(0,X)
-
-def tanh(X):
-    return np.tanh(X)
-
-def softmax(X):
-    exp_X = np.exp(X)
-    exp_X_sum = np.sum(exp_X,axis=1).reshape(-1,1)
-    exp_X = exp_X/exp_X_sum
-    return exp_X
-
-def swish(X):
-    return X/(1+np.exp(-X))
-
-def flatten(matrix):
-    try:
-        while matrix.ndim!=1:
-            matrix=matrix.flatten()
-    except:
-        matrix=matrix[0]
-        while matrix.ndim!=1:
-            matrix=matrix.flatten()
-    return matrix
-
-#derivative of tanh
-def tanh_derivative(X):
-    return 1-(X**2)
+import tensorflow_probability as tfp
 
 def tensor_conversion(x,lstm):
     arr=np.array(x)
@@ -270,8 +233,8 @@ class agentThree():
         board_hidden_3=tf.keras.layers.Dense(150,activation='relu',use_bias='true')(board_hidden_2)
         board_hidden_4=tf.keras.layers.Dense(100,activation='relu',use_bias='true')(board_hidden_3)
         board_hidden_5=tf.keras.layers.Dense(20,activation='relu',use_bias='true')(board_hidden_4)
-        board_mu=tf.keras.layers.Dense(8,activation='relu',use_bias='true')(board_hidden_5)
-        board_sigma=tf.keras.layers.Dense(8,activation='relu',use_bias='true')(board_hidden_5)
+        board_mu=tf.keras.layers.Dense(8,activation=None,use_bias='true')(board_hidden_5)
+        board_sigma=tf.keras.layers.Dense(8,activation='exponential',use_bias='true')(board_hidden_5)
         self.board_model=tf.keras.Model(inputs=absolute_state,outputs=[board_mu,board_sigma])
         #message policy ffns
         absolute_state=tf.keras.Input(shape=(1,200))
@@ -282,8 +245,8 @@ class agentThree():
         message_hidden_5=tf.keras.layers.Dense(350,activation='relu',use_bias='true')(message_hidden_4)
         message_hidden_6=tf.keras.layers.Dense(300,activation='relu',use_bias='true')(message_hidden_5)
         message_hidden_7=tf.keras.layers.Dense(250,activation='relu',use_bias='true')(message_hidden_6)
-        message_mu=tf.keras.layers.Dense(200,activation='relu',use_bias='true')(message_hidden_7)
-        message_sigma=tf.keras.layers.Dense(200,activation='relu',use_bias='true')(message_hidden_7)
+        message_mu=tf.keras.layers.Dense(200,activation=None,use_bias='true')(message_hidden_7)
+        message_sigma=tf.keras.layers.Dense(200,activation='exponential',use_bias='true')(message_hidden_7)
         self.message_model=tf.keras.Model(inputs=absolute_state,outputs=[message_mu,message_sigma])
         #value function ffns
         absolute_state=tf.keras.Input(shape=(1,200))
@@ -312,6 +275,7 @@ class agentThree():
         self.board_lr=0.00002
         self.message_lr=0.00002
         self.optimizer=tf.keras.optimizers.Adam()
+        self.huber_loss = tf.keras.losses.Huber(reduction=tf.keras.losses.Reduction.SUM)
         
     def stateConcatThree(self, fullState, msg):
         reward=fullState[2]
@@ -342,20 +306,18 @@ class agentThree():
         board_output=self.lstm_board_model(tensor_conversion(boardState,True))
         relation_output=self.lstm_relation_model(tensor_conversion(relationVals,True))
 
-        concat_state=np.concatenate((numpy_conversion(msg1_output),numpy_conversion(msg2_output),numpy_conversion(msg3_output),numpy_conversion(msg4_output),numpy_conversion(board_output),numpy_conversion(relation_output)))
+        concat_state=tf.concat([msg1_output,msg2_output,msg3_output,msg4_output,board_output,relation_output],1)
 
-        state=self.ffn_model(tensor_conversion(concat_state,True))
-
-        state=numpy_conversion(state)
+        state=self.ffn_model(tf.expand_dims(concat_state,0))
 
         self.absolute_state_history.append(state)
         
         return state
 
     def boardAction(self, state):
-        (mean,std)=self.board_model(tensor_conversion(state,True))
+        (mean,std)=self.board_model(state)
 
-        norm_dist=tf.compat.v1.distributions.Normal(mean,std)
+        norm_dist=tfp.distributions.Normal(mean,std)
         action=tf.squeeze(norm_dist.sample(1),axis=0)
 
         self.orig_action_history.append(action)
@@ -375,9 +337,9 @@ class agentThree():
         return boardAction, norm_dist
 
     def messageAction(self, state):
-        (mean,std)=self.message_model(tensor_conversion(state,True))
+        (mean,std)=self.message_model(state)
 
-        norm_dist=tf.compat.v1.distributions.Normal(mean,std)
+        norm_dist=tfp.distributions.Normal(mean,std)
         messages=tf.squeeze(norm_dist.sample(1),axis=0)
 
         self.orig_message_history.append(messages)
@@ -393,8 +355,7 @@ class agentThree():
         return messageAction, norm_dist
 
     def stateValue(self, state):
-        value=self.value_model(tensor_conversion(state,True))
-        value=numpy_conversion(value)
+        value=self.value_model(state)
         return value
 
     def updateParameters(self,oldAbsoluteState3,absoluteState3,currentStateValue1,currentStateValue2,oldStateValue1,oldStateValue2,reward,action,message,normdist_board,normdist_message):
@@ -425,29 +386,23 @@ class agentThree():
         value_error_board=(overall_board_reward+(self.lambda_val*self.stateValue(absoluteState3)))-self.stateValue(oldAbsoluteState3)
         value_error_message=(overall_message_reward+(self.lambda_val*self.stateValue(absoluteState3)))-self.stateValue(oldAbsoluteState3)
 
-        loss_board=-tf.math.log(normdist_board.prob(self.orig_action_history[-1])+1e-5)*value_error_board
-        loss_message=-tf.math.log(normdist_message.prob(self.orig_message_history[-1])+1e-5)*value_error_message
-        loss_critic=tf.math.reduce_mean(tf.math.squared_difference(tensor_conversion(self.stateValue(oldAbsoluteState3),False),value_error_target))
+        loss_board=-tf.math.reduce_sum(tf.math.log(normdist_board.prob(self.orig_action_history[-1]))*value_error_board)
+        loss_message=-tf.math.reduce_sum(tf.math.log(normdist_message.prob(self.orig_message_history[-1]))*value_error_message)
+        loss_critic=self.huber_loss(self.stateValue(oldAbsoluteState3),value_error_target)
 
         #there is an issue with critic grads and gradient pass through, but everything else seems to be working fine. I also think I don't need the second and third tape layers
 
         board_grads=tape.gradient(loss_board,self.board_model.trainable_variables)
         message_grads=tape.gradient(loss_message,self.message_model.trainable_variables)
         critic_grads=tape.gradient(loss_critic,self.value_model.trainable_variables)
-        ffn_grads=tape.gradient(tensor_conversion(critic_grads,False),self.ffn_model.trainable_variables)
+        ffn_grads=tape.gradient(critic_grads,self.ffn_model.trainable_variables)
 
-        msg1_in=ffn_grads[-1450:-1150]
-        msg1_grads=tape.gradient(tensor_conversion(msg1_in,False),self.lstm_msg1_model.trainable_variables)
-        msg2_in=ffn_grads[-1150:-850]
-        msg2_grads=tape.gradient(tensor_conversion(msg2_in,False),self.lstm_msg2_model.trainable_variables)
-        msg3_in=ffn_grads[-850:-550]
-        msg3_grads=tape.gradient(tensor_conversion(msg3_in,False),self.lstm_msg3_model.trainable_variables)
-        msg4_in=ffn_grads[-550:-250]
-        msg4_grads=tape.gradient(tensor_conversion(msg4_in,False),self.lstm_msg4_model.trainable_variables)
-        board_in=ffn_grads[-250:-50]
-        board_lstm_grads=tape.gradient(tensor_conversion(board_in,False),self.lstm_board_model.trainable_variables)
-        relation_in=ffn_grads[-50:]
-        relation_grads=tape.gradient(tensor_conversion(relation_in,False),self.lstm_relation_model.trainable_variables)
+        msg1_grads=tape.gradient(ffn_grads,self.lstm_msg1_model.trainable_variables)
+        msg2_grads=tape.gradient(ffn_grads,self.lstm_msg2_model.trainable_variables)
+        msg3_grads=tape.gradient(ffn_grads,self.lstm_msg3_model.trainable_variables)
+        msg4_grads=tape.gradient(ffn_grads,self.lstm_msg4_model.trainable_variables)
+        board_lstm_grads=tape.gradient(ffn_grads,self.lstm_board_model.trainable_variables)
+        relation_grads=tape.gradient(ffn_grads,self.lstm_relation_model.trainable_variables)
 
         self.optimizer.apply_gradients(zip(board_grads,self.board_model.trainable_variables))
         self.optimizer.apply_gradients(zip(message_grads,self.message_model.trainable_variables))
@@ -496,8 +451,8 @@ class agentTwo():
         board_hidden_3=tf.keras.layers.Dense(150,activation='relu',use_bias='true')(board_hidden_2)
         board_hidden_4=tf.keras.layers.Dense(100,activation='relu',use_bias='true')(board_hidden_3)
         board_hidden_5=tf.keras.layers.Dense(20,activation='relu',use_bias='true')(board_hidden_4)
-        board_mu=tf.keras.layers.Dense(7,activation='relu',use_bias='true')(board_hidden_5)
-        board_sigma=tf.keras.layers.Dense(7,activation='relu',use_bias='true')(board_hidden_5)
+        board_mu=tf.keras.layers.Dense(7,activation=None,use_bias='true')(board_hidden_5)
+        board_sigma=tf.keras.layers.Dense(7,activation='exponential',use_bias='true')(board_hidden_5)
         self.board_model=tf.keras.Model(inputs=absolute_state,outputs=[board_mu,board_sigma])
         #message policy ffns
         absolute_state=tf.keras.Input(shape=(1,200))
@@ -508,8 +463,8 @@ class agentTwo():
         message_hidden_5=tf.keras.layers.Dense(250,activation='relu',use_bias='true')(message_hidden_4)
         message_hidden_6=tf.keras.layers.Dense(200,activation='relu',use_bias='true')(message_hidden_5)
         message_hidden_7=tf.keras.layers.Dense(150,activation='relu',use_bias='true')(message_hidden_6)
-        message_mu=tf.keras.layers.Dense(100,activation='relu',use_bias='true')(message_hidden_7)
-        message_sigma=tf.keras.layers.Dense(100,activation='relu',use_bias='true')(message_hidden_7)
+        message_mu=tf.keras.layers.Dense(100,activation=None,use_bias='true')(message_hidden_7)
+        message_sigma=tf.keras.layers.Dense(100,activation='exponential',use_bias='true')(message_hidden_7)
         self.message_model=tf.keras.Model(inputs=absolute_state,outputs=[message_mu,message_sigma])
         #value function ffns
         absolute_state=tf.keras.Input(shape=(1,200))
@@ -524,12 +479,21 @@ class agentTwo():
         self.absolute_state_history=[]
         self.message_history_self=[np.zeros(100)]
         self.action_history_self=[np.zeros(8)]
+        self.orig_action_history=[]
+        self.orig_message_history=[]
         self.msgStateHistory=[]
         self.external_message_history=[]
         self.boardReward_history=[]
         self.generalReward_history=[]
         self.totalSpeakingReward_history=[]
         self.totalListeningReward_history=[]
+        #optimization objects
+        self.lambda_val=0.001
+        self.value_lr=0.00002
+        self.board_lr=0.00002
+        self.message_lr=0.00002
+        self.optimizer=tf.keras.optimizers.Adam()
+        self.huber_loss = tf.keras.losses.Huber(reduction=tf.keras.losses.Reduction.SUM)
         
     def stateConcatTwo(self, fullState):
         reward=fullState[0]
@@ -556,20 +520,20 @@ class agentTwo():
         board_output=self.lstm_board_model(tensor_conversion(boardState,True))
         relation_output=self.lstm_relation_model(tensor_conversion(relationVal,True))
 
-        concat_state=np.concatenate((numpy_conversion(msg2_output),numpy_conversion(msg4_output),numpy_conversion(board_output),numpy_conversion(relation_output)))
+        concat_state=tf.concat([msg2_output,msg4_output,board_output,relation_output],1)
 
-        state=self.ffn_model(tensor_conversion(concat_state,True))
-
-        state=numpy_conversion(state)
+        state=self.ffn_model(tf.expand_dims(concat_state,0))
 
         self.absolute_state_history.append(state)
         return state
 
     def boardAction(self, state):
-        (mean,std)=self.board_model(tensor_conversion(state,True))
+        (mean,std)=self.board_model(state)
 
-        norm_dist=tf.compat.v1.distributions.Normal(mean,std)
+        norm_dist=tfp.distributions.Normal(mean,std)
         action=tf.squeeze(norm_dist.sample(1),axis=0)
+
+        self.orig_action_history.append(action)
 
         action=numpy_conversion(action)
 
@@ -583,10 +547,12 @@ class agentTwo():
         return boardAction, norm_dist
         
     def messageAction(self, state):
-        (mean,std)=self.message_model(tensor_conversion(state,True))
+        (mean,std)=self.message_model(state)
 
-        norm_dist=tf.compat.v1.distributions.Normal(mean,std)
+        norm_dist=tfp.distributions.Normal(mean,std)
         message4=tf.squeeze(norm_dist.sample(1),axis=0)
+
+        self.orig_message_history.append(message4)
 
         message4=numpy_conversion(message4)
         
@@ -596,18 +562,48 @@ class agentTwo():
         return messageAction, norm_dist
     
     def stateValue(self, state):
-        value=self.value_model(tensor_conversion(state,True))
-        value=numpy_conversion(value)
+        value=self.value_model(state)
         return value
 
-    def updateParameters(self,oldAbsoluteState2,absoluteState2,reward):
+    def updateParameters(self,oldAbsoluteState2,absoluteState2,reward,action,message,normdist_board,normdist_message):
         ####This code regularizes the reward:####
+        (boardReward,generalReward,totalSpeakingReward,totalListeningReward)=reward
         self.boardReward_history.append(boardReward)
         self.generalReward_history.append(generalReward)
         self.totalSpeakingReward_history.append(totalSpeakingReward)
         self.totalListeningReward_history.append(totalListeningReward)
 
-        
+        overall_reward=boardReward+generalReward+totalSpeakingReward+totalListeningReward
+        overall_board_reward=boardReward+generalReward
+        overall_message_reward=generalReward+totalSpeakingReward+totalListeningReward
+
+        value_error_target=overall_reward+(self.lambda_val*self.stateValue(absoluteState2))
+        value_error_overall=(overall_reward+(self.lambda_val*self.stateValue(absoluteState2)))-self.stateValue(oldAbsoluteState2)
+        value_error_board=(overall_board_reward+(self.lambda_val*self.stateValue(absoluteState2)))-self.stateValue(oldAbsoluteState2)
+        value_error_message=(overall_message_reward+(self.lambda_val*self.stateValue(absoluteState2)))-self.stateValue(oldAbsoluteState2)
+
+        loss_board=-tf.math.reduce_sum(tf.math.log(normdist_board.prob(self.orig_action_history[-1]))*value_error_board)
+        loss_message=-tf.math.reduce_sum(tf.math.log(normdist_message.prob(self.orig_message_history[-1]))*value_error_message)
+        loss_critic=self.huber_loss(self.stateValue(oldAbsoluteState2),value_error_target)
+
+        board_grads=tape.gradient(loss_board,self.board_model.trainable_variables)
+        message_grads=tape.gradient(loss_message,self.message_model.trainable_variables)
+        critic_grads=tape.gradient(loss_critic,self.value_model.trainable_variables)
+        ffn_grads=tape.gradient(critic_grads,self.ffn_model.trainable_variables)
+
+        msg2_grads=tape.gradient(ffn_grads,self.lstm_msg2_model.trainable_variables)
+        msg4_grads=tape.gradient(ffn_grads,self.lstm_msg4_model.trainable_variables)
+        board_lstm_grads=tape.gradient(ffn_grads,self.lstm_board_model.trainable_variables)
+        relation_grads=tape.gradient(ffn_grads,self.lstm_relation_model.trainable_variables)
+
+        self.optimizer.apply_gradients(zip(board_grads,self.board_model.trainable_variables))
+        self.optimizer.apply_gradients(zip(message_grads,self.message_model.trainable_variables))
+        self.optimizer.apply_gradients(zip(critic_grads,self.value_model.trainable_variables))
+        self.optimizer.apply_gradients(zip(ffn_grads,self.ffn_model.trainable_variables))
+        self.optimizer.apply_gradients(zip(msg2_grads,self.lstm_msg2_model.trainable_variables))
+        self.optimizer.apply_gradients(zip(msg4_grads,self.lstm_msg4_model.trainable_variables))
+        self.optimizer.apply_gradients(zip(board_lstm_grads,self.lstm_board_model.trainable_variables))
+        self.optimizer.apply_gradients(zip(relation_grads,self.lstm_relation_model.trainable_variables))
             
 class agentOne():
     def __init__(self):
@@ -643,8 +639,8 @@ class agentOne():
         board_hidden_3=tf.keras.layers.Dense(150,activation='relu',use_bias='true')(board_hidden_2)
         board_hidden_4=tf.keras.layers.Dense(100,activation='relu',use_bias='true')(board_hidden_3)
         board_hidden_5=tf.keras.layers.Dense(20,activation='relu',use_bias='true')(board_hidden_4)
-        board_mu=tf.keras.layers.Dense(7,activation='relu',use_bias='true')(board_hidden_5)
-        board_sigma=tf.keras.layers.Dense(7,activation='relu',use_bias='true')(board_hidden_5)
+        board_mu=tf.keras.layers.Dense(7,activation=None,use_bias='true')(board_hidden_5)
+        board_sigma=tf.keras.layers.Dense(7,activation='exponential',use_bias='true')(board_hidden_5)
         self.board_model=tf.keras.Model(inputs=absolute_state,outputs=[board_mu,board_sigma])
         #message policy ffns
         absolute_state=tf.keras.Input(shape=(1,200))
@@ -655,8 +651,8 @@ class agentOne():
         message_hidden_5=tf.keras.layers.Dense(250,activation='relu',use_bias='true')(message_hidden_4)
         message_hidden_6=tf.keras.layers.Dense(200,activation='relu',use_bias='true')(message_hidden_5)
         message_hidden_7=tf.keras.layers.Dense(150,activation='relu',use_bias='true')(message_hidden_6)
-        message_mu=tf.keras.layers.Dense(100,activation='relu',use_bias='true')(message_hidden_7)
-        message_sigma=tf.keras.layers.Dense(100,activation='relu',use_bias='true')(message_hidden_7)
+        message_mu=tf.keras.layers.Dense(100,activation=None,use_bias='true')(message_hidden_7)
+        message_sigma=tf.keras.layers.Dense(100,activation='exponential',use_bias='true')(message_hidden_7)
         self.message_model=tf.keras.Model(inputs=absolute_state,outputs=[message_mu,message_sigma])
         #value function ffns
         absolute_state=tf.keras.Input(shape=(1,200))
@@ -671,18 +667,21 @@ class agentOne():
         self.absolute_state_history=[]
         self.message_history_self=[np.zeros(100)]
         self.action_history_self=[np.zeros(8)]
+        self.orig_action_history=[]
+        self.orig_message_history=[]
         self.msgStateHistory=[]
         self.external_message_history=[]
         self.boardReward_history=[]
         self.generalReward_history=[]
         self.totalSpeakingReward_history=[]
         self.totalListeningReward_history=[]
-        #hyperparameters
+        #optimization objects
+        self.lambda_val=0.001
+        self.value_lr=0.00002
         self.board_lr=0.00002
         self.message_lr=0.00002
-        self.lstm_lr=0.00002
-        self.ffn_lr=0.00002
-        self.critic_lr=0.001
+        self.optimizer=tf.keras.optimizers.Adam()
+        self.huber_loss = tf.keras.losses.Huber(reduction=tf.keras.losses.Reduction.SUM)
             
     def stateConcatOne(self, fullState):
         reward=fullState[1]
@@ -709,21 +708,21 @@ class agentOne():
         board_output=self.lstm_board_model(tensor_conversion(boardState,True))
         relation_output=self.lstm_relation_model(tensor_conversion(relationVal,True))
 
-        concat_state=np.concatenate((numpy_conversion(msg1_output),numpy_conversion(msg3_output),numpy_conversion(board_output),numpy_conversion(relation_output)))
+        concat_state=tf.concat([msg1_output,msg3_output,board_output,relation_output],1)
 
-        state=self.ffn_model(tensor_conversion(concat_state,True))
-
-        state=numpy_conversion(state)
+        state=self.ffn_model(tf.expand_dims(concat_state,0))
 
         self.absolute_state_history.append(state)
         return state
 
     def boardAction(self, state):
-        (mean,std)=self.board_model(tensor_conversion(state,True))
+        (mean,std)=self.board_model(state)
 
-        norm_dist=tf.compat.v1.distributions.Normal(mean,std)
+        norm_dist=tfp.distributions.Normal(mean,std)
         action=tf.squeeze(norm_dist.sample(1),axis=0)
 
+        self.orig_action_history.append(action)
+        
         action=numpy_conversion(action)
 
         action=np.insert(action,0,1)
@@ -736,10 +735,12 @@ class agentOne():
         return boardAction, norm_dist
         
     def messageAction(self, state):
-        (mean,std)=self.message_model(tensor_conversion(state,True))
+        (mean,std)=self.message_model(state)
 
-        norm_dist=tf.compat.v1.distributions.Normal(mean,std)
+        norm_dist=tfp.distributions.Normal(mean,std)
         message3=tf.squeeze(norm_dist.sample(1),axis=0)
+
+        self.orig_message_history.append(message3)
 
         message3=numpy_conversion(message3)
         
@@ -749,16 +750,48 @@ class agentOne():
         return messageAction, norm_dist
 
     def stateValue(self, state):
-        value=self.value_model(tensor_conversion(state,True))
-        value=numpy_conversion(value)
+        value=self.value_model(state)
         return value
 
-    def updateParameters(self,oldAbsoluteState1,absoluteState1,reward):
+    def updateParameters(self,oldAbsoluteState1,absoluteState1,reward,boardAction,messageAction,normdist_board,normdist_message):
         ####This code regularizes the reward:####
+        (boardReward,generalReward,totalSpeakingReward,totalListeningReward)=reward
         self.boardReward_history.append(boardReward)
         self.generalReward_history.append(generalReward)
         self.totalSpeakingReward_history.append(totalSpeakingReward)
         self.totalListeningReward_history.append(totalListeningReward)
+
+        overall_reward=boardReward+generalReward+totalSpeakingReward+totalListeningReward
+        overall_board_reward=boardReward+generalReward
+        overall_message_reward=generalReward+totalSpeakingReward+totalListeningReward
+
+        value_error_target=overall_reward+(self.lambda_val*self.stateValue(absoluteState1))
+        value_error_overall=(overall_reward+(self.lambda_val*self.stateValue(absoluteState1)))-self.stateValue(oldAbsoluteState1)
+        value_error_board=(overall_board_reward+(self.lambda_val*self.stateValue(absoluteState1)))-self.stateValue(oldAbsoluteState1)
+        value_error_message=(overall_message_reward+(self.lambda_val*self.stateValue(absoluteState1)))-self.stateValue(oldAbsoluteState1)
+
+        loss_board=-tf.math.reduce_sum(tf.math.log(normdist_board.prob(self.orig_action_history[-1]))*value_error_board)
+        loss_message=-tf.math.reduce_sum(tf.math.log(normdist_message.prob(self.orig_message_history[-1]))*value_error_message)
+        loss_critic=self.huber_loss(self.stateValue(oldAbsoluteState1),value_error_target)
+
+        board_grads=tape.gradient(loss_board,self.board_model.trainable_variables)
+        message_grads=tape.gradient(loss_message,self.message_model.trainable_variables)
+        critic_grads=tape.gradient(loss_critic,self.value_model.trainable_variables)
+        ffn_grads=tape.gradient(critic_grads,self.ffn_model.trainable_variables)
+
+        msg1_grads=tape.gradient(ffn_grads,self.lstm_msg1_model.trainable_variables)
+        msg3_grads=tape.gradient(ffn_grads,self.lstm_msg3_model.trainable_variables)
+        board_lstm_grads=tape.gradient(ffn_grads,self.lstm_board_model.trainable_variables)
+        relation_grads=tape.gradient(ffn_grads,self.lstm_relation_model.trainable_variables)
+
+        self.optimizer.apply_gradients(zip(board_grads,self.board_model.trainable_variables))
+        self.optimizer.apply_gradients(zip(message_grads,self.message_model.trainable_variables))
+        self.optimizer.apply_gradients(zip(critic_grads,self.value_model.trainable_variables))
+        self.optimizer.apply_gradients(zip(ffn_grads,self.ffn_model.trainable_variables))
+        self.optimizer.apply_gradients(zip(msg1_grads,self.lstm_msg1_model.trainable_variables))
+        self.optimizer.apply_gradients(zip(msg3_grads,self.lstm_msg3_model.trainable_variables))
+        self.optimizer.apply_gradients(zip(board_lstm_grads,self.lstm_board_model.trainable_variables))
+        self.optimizer.apply_gradients(zip(relation_grads,self.lstm_relation_model.trainable_variables))
 
 #main program initialization
 checkers=checkersEnvironment()
@@ -787,86 +820,68 @@ while True:
             tape.watch(agentThree.board_model.trainable_variables)
             tape.watch(agentThree.message_model.trainable_variables)
             tape.watch(agentThree.value_model.trainable_variables)
-            with tf.GradientTape(persistent=True) as tape2:
-                tape2.watch(agentThree.lstm_msg1_model.trainable_variables)
-                tape2.watch(agentThree.lstm_msg2_model.trainable_variables)
-                tape2.watch(agentThree.lstm_msg3_model.trainable_variables)
-                tape2.watch(agentThree.lstm_msg4_model.trainable_variables)
-                tape2.watch(agentThree.lstm_board_model.trainable_variables)
-                tape2.watch(agentThree.lstm_relation_model.trainable_variables)
-                tape2.watch(agentThree.ffn_model.trainable_variables)
-                tape2.watch(agentThree.value_model.trainable_variables)
-                with tf.GradientTape(persistent=True) as tape3:
-                    tape3.watch(agentThree.lstm_msg1_model.trainable_variables)
-                    tape3.watch(agentThree.lstm_msg2_model.trainable_variables)
-                    tape3.watch(agentThree.lstm_msg3_model.trainable_variables)
-                    tape3.watch(agentThree.lstm_msg4_model.trainable_variables)
-                    tape3.watch(agentThree.lstm_board_model.trainable_variables)
-                    tape3.watch(agentThree.lstm_relation_model.trainable_variables)
-                    tape3.watch(agentThree.ffn_model.trainable_variables)
-                    tape3.watch(agentThree.value_model.trainable_variables)
             
-                    ###AGENT THREE ROUND###
-                    #set new states
-                    absoluteState3=agentThree.stateConcatThree(fullState,0)
-                    absoluteState2=agentTwo.stateConcatTwo(fullState)
-                    absoluteState1=agentOne.stateConcatOne(fullState)
-                    #get actions
-                    (boardAction,normDistBoard)=agentThree.boardAction(absoluteState3)
-                    (messageAction,normDistMessage)=agentThree.messageAction(absoluteState3)
-                    #get rewards
-                    (currentState, isTerminal, boardReward, generalReward)=checkers.envStepBoard(boardAction)
-                    (totalSpeakingReward, totalListeningReward)=checkers.envStepMessage(agentThree.msgStateHistory,agentThree.message_history_self,agentThree.action_history_self,agentThree.external_message_history)
-                    reward=[boardReward,generalReward,totalSpeakingReward,totalListeningReward]
-                    #new state go get relationship vals
-                    (oldAbsoluteState1,oldAbsoluteState2,oldAbsoluteState3, fullState)=checkers.prepNewState(messageAction,isTerminal,reward,currentState,absoluteState1,absoluteState2,absoluteState3,3)
-                    absoluteState3=agentThree.stateConcatThree(fullState,0)
-                    absoluteState2=agentTwo.stateConcatTwo(fullState)
-                    absoluteState1=agentOne.stateConcatOne(fullState)
-                    currentStateValue1=agentOne.stateValue(absoluteState1)
-                    currentStateValue2=agentTwo.stateValue(absoluteState2)
-                    oldStateValue1=agentOne.stateValue(oldAbsoluteState1)
-                    oldStateValue2=agentTwo.stateValue(oldAbsoluteState2)
-                    #update parameters and output relations
-                    relations=agentThree.updateParameters(oldAbsoluteState3,absoluteState3,currentStateValue1,currentStateValue2,oldStateValue1,oldStateValue2,reward,boardAction,messageAction,normDistBoard,normDistMessage)
-                    print("agent 3 round done")
+            ###AGENT THREE ROUND###
+            #set new states
+            absoluteState3=agentThree.stateConcatThree(fullState,0)
+            absoluteState2=agentTwo.stateConcatTwo(fullState)
+            absoluteState1=agentOne.stateConcatOne(fullState)
+            #get actions
+            (boardAction,normDistBoard)=agentThree.boardAction(absoluteState3)
+            (messageAction,normDistMessage)=agentThree.messageAction(absoluteState3)
+            #get rewards
+            (currentState, isTerminal, boardReward, generalReward)=checkers.envStepBoard(boardAction)
+            (totalSpeakingReward, totalListeningReward)=checkers.envStepMessage(agentThree.msgStateHistory,agentThree.message_history_self,agentThree.action_history_self,agentThree.external_message_history)
+            reward=[boardReward,generalReward,totalSpeakingReward,totalListeningReward]
+            #new state go get relationship vals
+            (oldAbsoluteState1,oldAbsoluteState2,oldAbsoluteState3, fullState)=checkers.prepNewState(messageAction,isTerminal,reward,currentState,absoluteState1,absoluteState2,absoluteState3,3)
+            absoluteState3=agentThree.stateConcatThree(fullState,0)
+            absoluteState2=agentTwo.stateConcatTwo(fullState)
+            absoluteState1=agentOne.stateConcatOne(fullState)
+            currentStateValue1=agentOne.stateValue(absoluteState1)
+            currentStateValue2=agentTwo.stateValue(absoluteState2)
+            oldStateValue1=agentOne.stateValue(oldAbsoluteState1)
+            oldStateValue2=agentTwo.stateValue(oldAbsoluteState2)
+            #update parameters and output relations
+            relations=agentThree.updateParameters(oldAbsoluteState3,absoluteState3,currentStateValue1,currentStateValue2,oldStateValue1,oldStateValue2,reward,boardAction,messageAction,normDistBoard,normDistMessage)
+            print("agent 3 round done")
         
-                    ###AGENT ONE ROUND###
-                    #update states to incorporate new relationship values
-                    fullState=checkers.updateState(relations)
-                    absoluteState3=agentThree.stateConcatThree(fullState,0)
-                    absoluteState2=agentTwo.stateConcatTwo(fullState)
-                    absoluteState1=agentOne.stateConcatOne(fullState)
-                    #get actions
-                    (boardAction,normDistBoard)=agentOne.boardAction(absoluteState1)
-                    (messageAction,normDistMessage)=agentOne.messageAction(absoluteState1)
-                    #get rewards
-                    (currentState, isTerminal, boardReward, generalReward)=checkers.envStepBoard(boardAction)
-                    (totalSpeakingReward, totalListeningReward)=checkers.envStepMessage(agentOne.msgStateHistory,agentOne.message_history_self,agentOne.action_history_self,agentOne.external_message_history)
-                    reward=[boardReward,generalReward,totalSpeakingReward,totalListeningReward]
-                    #new fullstate
-                    (oldAbsoluteState1,oldAbsoluteState2,oldAbsoluteState3, fullState)=checkers.prepNewState(messageAction,isTerminal,reward,currentState,absoluteState1,absoluteState2,absoluteState3,1)
-                    #update parameters
-                    print("agent 1 round done")
+            ###AGENT ONE ROUND###
+            #update states to incorporate new relationship values
+            fullState=checkers.updateState(relations)
+            absoluteState3=agentThree.stateConcatThree(fullState,0)
+            absoluteState2=agentTwo.stateConcatTwo(fullState)
+            absoluteState1=agentOne.stateConcatOne(fullState)
+            #get actions
+            (boardAction,normDistBoard)=agentOne.boardAction(absoluteState1)
+            (messageAction,normDistMessage)=agentOne.messageAction(absoluteState1)
+            #get rewards
+            (currentState, isTerminal, boardReward, generalReward)=checkers.envStepBoard(boardAction)
+            (totalSpeakingReward, totalListeningReward)=checkers.envStepMessage(agentOne.msgStateHistory,agentOne.message_history_self,agentOne.action_history_self,agentOne.external_message_history)
+            reward=[boardReward,generalReward,totalSpeakingReward,totalListeningReward]
+            #new fullstate
+            (oldAbsoluteState1,oldAbsoluteState2,oldAbsoluteState3, fullState)=checkers.prepNewState(messageAction,isTerminal,reward,currentState,absoluteState1,absoluteState2,absoluteState3,1)
+            #update parameters
+            agentOne.updateParameters(oldAbsoluteState1,absoluteState1,reward,boardAction,messageAction,normDistBoard,normDistMessage)
+            print("agent 1 round done")
 
-                    ###AGENT TWO ROUND###
-                    #update states to account for agent 1's action
-                    absoluteState3=agentThree.stateConcatThree(fullState,1)
-                    absoluteState2=agentTwo.stateConcatTwo(fullState)
-                    absoluteState1=agentOne.stateConcatOne(fullState)
-                    #get actions
-                    (boardAction,normDistBoard)=agentTwo.boardAction(absoluteState2)
-                    (messageAction,normDistMessage)=agentTwo.messageAction(absoluteState2)
-                    #get rewards
-                    (currentState, isTerminal, boardReward, generalReward)=checkers.envStepBoard(boardAction)
-                    (totalSpeakingReward, totalListeningReward)=checkers.envStepMessage(agentTwo.msgStateHistory,agentTwo.message_history_self,agentTwo.action_history_self,agentTwo.external_message_history)
-                    reward=[boardReward,generalReward,totalSpeakingReward,totalListeningReward]
-                    #new fullstate
-                    (oldAbsoluteState1,oldAbsoluteState2,oldAbsoluteState3, fullState)=checkers.prepNewState(messageAction,isTerminal,reward,currentState,absoluteState1,absoluteState2,absoluteState3,2)
-                    #update parameters
-                    print("agent 2 round done")
-                    tape3.reset()
-                tape2.reset()
+            ###AGENT TWO ROUND###
+            #update states to account for agent 1's action
+            absoluteState3=agentThree.stateConcatThree(fullState,1)
+            absoluteState2=agentTwo.stateConcatTwo(fullState)
+            absoluteState1=agentOne.stateConcatOne(fullState)
+            #get actions
+            (boardAction,normDistBoard)=agentTwo.boardAction(absoluteState2)
+            (messageAction,normDistMessage)=agentTwo.messageAction(absoluteState2)
+            #get rewards
+            (currentState, isTerminal, boardReward, generalReward)=checkers.envStepBoard(boardAction)
+            (totalSpeakingReward, totalListeningReward)=checkers.envStepMessage(agentTwo.msgStateHistory,agentTwo.message_history_self,agentTwo.action_history_self,agentTwo.external_message_history)
+            reward=[boardReward,generalReward,totalSpeakingReward,totalListeningReward]
+            #new fullstate
+            (oldAbsoluteState1,oldAbsoluteState2,oldAbsoluteState3, fullState)=checkers.prepNewState(messageAction,isTerminal,reward,currentState,absoluteState1,absoluteState2,absoluteState3,2)
+            #update parameters
+            agentTwo.updateParameters(oldAbsoluteState2,absoluteState2,reward,boardAction,messageAction,normDistBoard,normDistMessage)
+            print("agent 2 round done")
             tape.reset()
         if isTerminal==True:
             terminal=True
