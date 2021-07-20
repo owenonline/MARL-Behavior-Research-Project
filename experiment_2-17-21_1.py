@@ -5,6 +5,19 @@ import numpy as np
 import math
 from random import randint
 
+#hyperparameters
+#same for all 3 agents: 
+#starting input range=0,0.1
+#starting biases=1 for lstm, 0 for everything else
+#discount factor for relation stuff: 0.1
+#value discount factor=0.1 (doesn't appear used)
+#step size for value function=0.1
+#step size for board= 0.1
+#step size for messages=0.1
+#i starting value=1
+#ffn learning rate=0.1
+#lstm learning rate=0.1
+
 #Activation Functions
 def sigmoid(X):
     return 1/(1+np.exp(-X))
