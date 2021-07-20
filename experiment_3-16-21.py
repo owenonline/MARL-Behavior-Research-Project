@@ -164,7 +164,13 @@ class checkersEnvironment():
             msgDiff=1/(1-np.exp(-(msgDiff-4)))
             stateDiff=1/(1-np.exp(-(stateDiff-4)))
 
-            totalSpeakingReward=totalSpeakingReward+(-np.absolute(msgDiff-stateDiff)*lambdaVar)
+            temp=0
+            if msgDiff>stateDiff:
+                temp=msgDiff/stateDiff
+            else:
+                temp=stateDiff/msgDiff
+
+            totalSpeakingReward=totalSpeakingReward+(-np.absolute(temp)*lambdaVar)
         totalSpeakingReward=totalSpeakingReward/len(stateHistory)
         #now it's time to get the listening reward.
         totalListeningReward=0
@@ -175,7 +181,13 @@ class checkersEnvironment():
             actionDiff=1/(1-np.exp(-(actionDiff-4)))
             msgDiff=1/(1-np.exp(-(msgDiff-4)))
 
-            totalListeningReward=totalListeningReward+(-np.absolute(actionDiff-msgDiff)*lambdaVar)
+            temp=0
+            if msgDiff>actionDiff:
+                temp=msgDiff/actionDiff
+            else:
+                temp=actionDiff/msgDiff
+
+            totalListeningReward=totalListeningReward+(-np.absolute(temp)*lambdaVar)
         totalListeningReward=totalListeningReward/len(externalMessageHistory)
         #to prevent it from being 0 at the start and give a lil motivation imma make it slightly negative
         totalListeningReward=totalListeningReward-0.001
@@ -282,7 +294,6 @@ class agentThree():
                 x=1
         if x==0 and msg!=1:
             self.external_message_history.append(np.concatenate((messageThree,messageFour)))
-            print("agent three message history increased from "+str(len(self.external_message_history)-1)+" to "+str(len(self.external_message_history)))
         lstm_inputs=[messageOne,messageTwo,messageThree,messageFour,boardState,relationVals]
         self.lstm_inputs.append(lstm_inputs)
         for x in range(len(lstm_inputs)):
@@ -317,17 +328,27 @@ class agentThree():
 
     def boardAction(self):
         nn8=np.matmul(self.board_policy_params,self.ffn_outputs[1])+self.board_policy_biases
-        orig_nn8=nn8
-        if nn8[0]>-1.5:
-            nn8[0]=-1
+        alternateAction=[(np.random.random()*3)-3,(np.random.random()*10)-10,(np.random.random()*8),(np.random.random()*8),(np.random.random()*8),(np.random.random()*8),(np.random.random()*8),(np.random.random()*8)]
+        orig_action=[]
+        action=[]
+        if np.random.randint(1,11)<6:
+            orig_action=alternateAction
+            action=alternateAction
         else:
-            nn8[0]=-2
-        nn8[1]=np.round((5/(1+np.exp(-nn8[1]-5))))
-        for x in range(len(nn8[2:])):
-            nn8[x+2]=np.round((4/(1+np.exp(-(nn8[1]-4))))-2)
-        boardAction=[nn8[0],nn8[1],nn8[2:]]
-        self.board_policy_backprop_info.append(orig_nn8)
-        self.action_history_self.append(nn8)
+            orig_action=nn8
+            action=nn8
+        
+        if action[0]>-1.5:
+            action[0]=-1
+        else:
+            action[0]=-2
+        action[1]=np.round((5/(1+np.exp(-action[1]-5))))
+        for x in range(len(action[2:])):
+            action[x+2]=np.round((4/(1+np.exp(-(action[x+2]-4))))-2)
+
+        boardAction=[action[0],action[1],action[2:]]
+        self.board_policy_backprop_info.append(orig_action)
+        self.action_history_self.append(action)
         return boardAction
 
     def messageAction(self):
@@ -359,17 +380,10 @@ class agentThree():
         self.totalSpeakingReward_history.append(totalSpeakingReward)
         self.totalListeningReward_history.append(totalListeningReward)
 
-        boardRewardAvg=sum(self.boardReward_history)/len(self.boardReward_history)
-        boardRewardRegularized=boardReward/boardRewardAvg
-        generalRewardAvg=sum(self.generalReward_history)/len(self.generalReward_history)
-        generalRewardRegularized=generalReward/generalRewardAvg
-        totalSpeakingRewardAvg=sum(self.totalSpeakingReward_history)/len(self.totalSpeakingReward_history)
-        totalSpeakingRewardRegularized=totalSpeakingReward/totalSpeakingRewardAvg
-        totalListeningRewardAvg=sum(self.totalListeningReward_history)/len(self.totalListeningReward_history)
-        totalListeningRewardRegularized=totalListeningReward/totalListeningRewardAvg
-
         ####This code amalgamates the reward into one value:####
-        totalRewardAvg=(boardRewardRegularized+generalRewardRegularized+totalSpeakingRewardRegularized+totalListeningRewardRegularized)/4
+        totalReward=boardReward+generalReward+totalSpeakingReward+totalListeningReward
+        totalBoardReward=boardReward+generalReward
+        totalMesagReward=generalReward+totalSpeakingReward+totalListeningReward
         ##This code calculates the value of the current state
         currentStateValue3=swish(np.matmul(self.value_fn_params,absoluteState3))
         oldStateValue3=swish(np.matmul(self.value_fn_params,oldAbsoluteState3))
@@ -380,7 +394,10 @@ class agentThree():
         stepSizeValue=0.01
         #y'=y+sigmoid(x)*(1-y)...this is multiplied by the old state because to do the backprop thing u have to back propogate all the way from the value to the input
         value_derivative=oldStateValue3+sigmoid(np.matmul(self.value_fn_params,oldAbsoluteState3))*(1-oldStateValue3)
-        valueError=totalRewardAvg+(0.1*currentStateValue3)-oldStateValue3
+        valueError=totalReward+(0.1*currentStateValue3)-oldStateValue3
+        valueErrorBoard=totalBoardReward+(0.1*currentStateValue3)-oldStateValue3
+        valueErrorMesag=totalMesagReward+(0.1*currentStateValue3)-oldStateValue3
+        #self.value_fn_params=self.value_fn_params+stepSizeValue*valueError*value_derivative*oldAbsoluteState3
         self.value_fn_params=self.value_fn_params+stepSizeValue*valueError*value_derivative*oldAbsoluteState3
         
         ####This code calculates the new values for the board policy####
@@ -389,7 +406,8 @@ class agentThree():
         mean_board=self.board_policy_backprop_info[-2]
         ##
         p1=[1/x**2 for x in standard_deviation_board]
-        p2=[stepSizeBoard-x for x in mean_board]
+        p2=self.board_policy_backprop_info[-1]-(np.matmul(self.board_policy_params,oldAbsoluteState3)+self.board_policy_biases)
+        #p2=[stepSizeBoard-x for x in mean_board]
         p3=np.multiply(p1,p2)
         self.board_policy_biases=self.board_policy_biases+[stepSizeBoard*x for x in p3]
         #
@@ -424,8 +442,10 @@ class agentThree():
         #p5=np.matmul(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState3)))))
         gradient_std_board=p5
         ##
-        self.board_policy_params=self.board_policy_params+np.multiply((stepSizeBoard*self.I*valueError),gradient_mean_board)
-        self.board_policy_std_params=self.board_policy_std_params+np.multiply((stepSizeBoard*self.I*valueError),gradient_std_board)
+        #self.board_policy_params=self.board_policy_params+np.multiply((stepSizeBoard*self.I*valueError),gradient_mean_board)
+        #self.board_policy_std_params=self.board_policy_std_params+np.multiply((stepSizeBoard*self.I*valueError),gradient_std_board)
+        self.board_policy_params=self.board_policy_params+np.multiply((stepSizeBoard*self.I*valueErrorBoard),gradient_mean_board)
+        self.board_policy_std_params=self.board_policy_std_params+np.multiply((stepSizeBoard*self.I*valueErrorBoard),gradient_std_board)
         
         ####This code calculates the new values for the message policy####
         stepSizeMessage=0.01
@@ -433,7 +453,8 @@ class agentThree():
         mean_message=self.msg_policy_backprop_info[-2]
         ##
         p1=[1/x**2 for x in standard_deviation_message]
-        p2=[stepSizeMessage-x for x in mean_message]
+        p2=self.msg_policy_backprop_info[-1]-(np.matmul(self.msg_policy_params,oldAbsoluteState3)+self.msg_policy_biases)
+        #p2=[stepSizeMessage-x for x in mean_message]
         p3=np.multiply(p1,p2)
         self.msg_policy_biases=self.msg_policy_biases+[stepSizeMessage*x for x in p3]
         #
@@ -468,8 +489,11 @@ class agentThree():
         #p5=np.matmul(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState3)))))
         gradient_std_message=p5
         ##
-        self.msg_policy_params=self.msg_policy_params+np.multiply((stepSizeMessage*self.I*valueError),gradient_mean_message)
-        self.msg_policy_std_params=self.msg_policy_std_params+np.multiply((stepSizeMessage*self.I*valueError),gradient_std_message)
+        #self.msg_policy_params=self.msg_policy_params+np.multiply((stepSizeMessage*self.I*valueError),gradient_mean_message)
+        #self.msg_policy_std_params=self.msg_policy_std_params+np.multiply((stepSizeMessage*self.I*valueError),gradient_std_message)
+        self.msg_policy_params=self.msg_policy_params+np.multiply((stepSizeMessage*self.I*valueErrorMesag),gradient_mean_message)
+        self.msg_policy_std_params=self.msg_policy_std_params+np.multiply((stepSizeMessage*self.I*valueErrorMesag),gradient_std_message)
+
         
         self.I=self.I*valueDiscount
         ####This code does gradient passing back to the FFN's####
@@ -544,7 +568,7 @@ class agentThree():
             self.lstm_biases[x][2]=np.transpose(self.lstm_biases[x][2]+r*gaError)
             self.lstm_biases[x][3]=np.transpose(self.lstm_biases[x][3]+r*oaError)
 
-        return relations, totalRewardAvg
+        return relations, totalReward, boardReward, generalReward, totalSpeakingReward, totalListeningReward
         
 class agentTwo():
     def __init__(self):
@@ -617,7 +641,6 @@ class agentTwo():
                 x=1
         if x==0:
             self.external_message_history.append(messageTwo)
-            print("agent two message history increased from "+str(len(self.external_message_history)-1)+" to "+str(len(self.external_message_history)))
         lstm_inputs=[messageTwo,messageFour,boardState,relationVal]
         self.lstm_inputs.append(lstm_inputs)
         for x in range(len(lstm_inputs)):
@@ -652,13 +675,21 @@ class agentTwo():
     def boardAction(self):
         nn8=np.matmul(self.board_policy_params,self.ffn_outputs[1])+self.board_policy_biases
         nn8=np.insert(nn8,0,2)
-        orig_nn8=nn8
-        nn8[1]=np.round((5/(1+np.exp(-nn8[1]-5))))
-        for x in range(len(nn8[2:])):
-            nn8[x+2]=np.round((4/(1+np.exp(-(nn8[1]-4))))-2)
-        boardAction=[nn8[0],nn8[1],nn8[2:]]
-        self.board_policy_backprop_info.append(orig_nn8)
-        self.action_history_self.append(orig_nn8)
+        alternateAction=[2,(np.random.random()*10)-10,(np.random.random()*8),(np.random.random()*8),(np.random.random()*8),(np.random.random()*8),(np.random.random()*8),(np.random.random()*8)]
+        orig_action=[]
+        action=[]
+        if np.random.randint(1,11)<6:
+            orig_action=alternateAction
+            action=alternateAction
+        else:
+            orig_action=nn8
+            action=nn8
+        action[1]=np.round((5/(1+np.exp(-action[1]-5))))
+        for x in range(len(action[2:])):
+            action[x+2]=np.round((4/(1+np.exp(-(action[x+2]-4))))-2)
+        boardAction=[action[0],action[1],action[2:]]
+        self.board_policy_backprop_info.append(orig_action)
+        self.action_history_self.append(action)
         return boardAction
         
     def messageAction(self):
@@ -681,17 +712,10 @@ class agentTwo():
         self.totalSpeakingReward_history.append(totalSpeakingReward)
         self.totalListeningReward_history.append(totalListeningReward)
 
-        boardRewardAvg=sum(self.boardReward_history)/len(self.boardReward_history)
-        boardRewardRegularized=boardReward/boardRewardAvg
-        generalRewardAvg=sum(self.generalReward_history)/len(self.generalReward_history)
-        generalRewardRegularized=generalReward/generalRewardAvg
-        totalSpeakingRewardAvg=sum(self.totalSpeakingReward_history)/len(self.totalSpeakingReward_history)
-        totalSpeakingRewardRegularized=totalSpeakingReward/totalSpeakingRewardAvg
-        totalListeningRewardAvg=sum(self.totalListeningReward_history)/len(self.totalListeningReward_history)
-        totalListeningRewardRegularized=totalListeningReward/totalListeningRewardAvg
-
         ####This code amalgamates the reward into one value:####
-        totalRewardAvg=(boardRewardRegularized+generalRewardRegularized+totalSpeakingRewardRegularized+totalListeningRewardRegularized)/4
+        totalReward=boardReward+generalReward+totalSpeakingReward+totalListeningReward
+        totalBoardReward=boardReward+generalReward
+        totalMesagReward=generalReward+totalSpeakingReward+totalListeningReward
         ##This code calculates the value of the current state
         currentStateValue2=swish(np.matmul(self.value_fn_params,absoluteState2))
         oldStateValue2=swish(np.matmul(self.value_fn_params,oldAbsoluteState2))
@@ -702,8 +726,11 @@ class agentTwo():
         stepSizeValue=0.01
         #y'=y+sigmoid(x)*(1-y)...this is multiplied by the old state because to do the backprop thing u have to back propogate all the way from the value to the input
         value_derivative=oldStateValue2+sigmoid(np.matmul(self.value_fn_params,oldAbsoluteState2))*(1-oldStateValue2)
-        valueError=totalRewardAvg+(0.1*currentStateValue2)-oldStateValue2
-        self.value_fn_params=self.value_fn_params+stepSizeValue*valueError*value_derivative*oldAbsoluteState2
+        valueError=totalReward+(0.1*currentStateValue2)-oldStateValue2
+        valueErrorBoard=totalBoardReward+(0.1*currentStateValue2)-oldStateValue2
+        valueErrorMesag=totalMesagReward+(0.1*currentStateValue2)-oldStateValue2
+        #self.value_fn_params=self.value_fn_params+stepSizeValue*valueError*value_derivative*oldAbsoluteState2
+        self.value_fn_params=self.value_fn_params+stepSizeValue*valueError*value_derivative
         
         ####This code calculates the new values for the board policy####
         stepSizeBoard=0.01
@@ -711,7 +738,8 @@ class agentTwo():
         mean_board=self.board_policy_backprop_info[-2][1:]
         ##
         p1=[1/x**2 for x in standard_deviation_board]
-        p2=[stepSizeBoard-x for x in mean_board]
+        p2=self.board_policy_backprop_info[-1][1:]-(np.matmul(self.board_policy_params,oldAbsoluteState2)+self.board_policy_biases)
+        #p2=[stepSizeBoard-x for x in mean_board]
         p3=np.multiply(p1,p2)
         self.board_policy_biases=self.board_policy_biases+[stepSizeBoard*x for x in p3]
         #
@@ -746,8 +774,10 @@ class agentTwo():
         #p5=np.matmul(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState2)))))
         gradient_std_board=p5
         ##
-        self.board_policy_params=self.board_policy_params+np.multiply((stepSizeBoard*self.I*valueError),gradient_mean_board)
-        self.board_policy_std_params=self.board_policy_std_params+np.multiply((stepSizeBoard*self.I*valueError),gradient_std_board)
+        #self.board_policy_params=self.board_policy_params+np.multiply((stepSizeBoard*self.I*valueError),gradient_mean_board)
+        #self.board_policy_std_params=self.board_policy_std_params+np.multiply((stepSizeBoard*self.I*valueError),gradient_std_board)
+        self.board_policy_params=self.board_policy_params+np.multiply((stepSizeBoard*self.I*valueErrorBoard),gradient_mean_board)
+        self.board_policy_std_params=self.board_policy_std_params+np.multiply((stepSizeBoard*self.I*valueErrorBoard),gradient_std_board)
         
         ####This code calculates the new values for the message policy####
         stepSizeMessage=0.01
@@ -755,7 +785,8 @@ class agentTwo():
         mean_message=self.msg_policy_backprop_info[-2]
         ##
         p1=[1/x**2 for x in standard_deviation_message]
-        p2=[stepSizeMessage-x for x in mean_message]
+        p2=self.msg_policy_backprop_info[-1]-(np.matmul(self.msg_policy_params,oldAbsoluteState2)+self.msg_policy_biases)
+        #p2=[stepSizeMessage-x for x in mean_message]
         p3=np.multiply(p1,p2)
         self.msg_policy_biases=self.msg_policy_biases+[stepSizeMessage*x for x in p3]
         #
@@ -790,8 +821,10 @@ class agentTwo():
         #p5=np.matmul(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState2)))))
         gradient_std_message=p5
         ##
-        self.msg_policy_params=self.msg_policy_params+np.multiply((stepSizeMessage*self.I*valueError),gradient_mean_message)
-        self.msg_policy_std_params=self.msg_policy_std_params+np.multiply((stepSizeMessage*self.I*valueError),gradient_std_message)
+        #self.msg_policy_params=self.msg_policy_params+np.multiply((stepSizeMessage*self.I*valueError),gradient_mean_message)
+        #self.msg_policy_std_params=self.msg_policy_std_params+np.multiply((stepSizeMessage*self.I*valueError),gradient_std_message)
+        self.msg_policy_params=self.msg_policy_params+np.multiply((stepSizeMessage*self.I*valueErrorMesag),gradient_mean_message)
+        self.msg_policy_std_params=self.msg_policy_std_params+np.multiply((stepSizeMessage*self.I*valueErrorMesag),gradient_std_message)
         
         self.I=self.I*valueDiscount
         ####This code does gradient passing back to the FFN's####
@@ -864,7 +897,7 @@ class agentTwo():
             self.lstm_biases[x][2]=np.transpose(self.lstm_biases[x][2]+r*gaError)
             self.lstm_biases[x][3]=np.transpose(self.lstm_biases[x][3]+r*oaError)
 
-        return totalRewardAvg
+        return totalReward, boardReward, generalReward, totalSpeakingReward, totalListeningReward
 
         
             
@@ -940,7 +973,6 @@ class agentOne():
                 x=1
         if x==0:
             self.external_message_history.append(messageOne)
-            print("agent one message history increased from "+str(len(self.external_message_history)-1)+" to "+str(len(self.external_message_history)))
         lstm_inputs=[messageOne,messageThree,boardState,relationVal]
         self.lstm_inputs.append(lstm_inputs)
         for x in range(len(lstm_inputs)):
@@ -975,13 +1007,21 @@ class agentOne():
     def boardAction(self):
         nn8=np.matmul(self.board_policy_params,self.ffn_outputs[1])+self.board_policy_biases
         nn8=np.insert(nn8,0,1)
-        orig_nn8=nn8
-        nn8[1]=np.round((5/(1+np.exp(-nn8[1]-5))))
-        for x in range(len(nn8[2:])):
-            nn8[x+2]=np.round((4/(1+np.exp(-(nn8[1]-4))))-2)
-        boardAction=[nn8[0],nn8[1],nn8[2:]]
-        self.board_policy_backprop_info.append(orig_nn8)
-        self.action_history_self.append(orig_nn8)
+        alternateAction=[1,(np.random.random()*10)-10,(np.random.random()*8),(np.random.random()*8),(np.random.random()*8),(np.random.random()*8),(np.random.random()*8),(np.random.random()*8)]
+        orig_action=[]
+        action=[]
+        if np.random.randint(1,11)<6:
+            orig_action=alternateAction
+            action=alternateAction
+        else:
+            orig_action=nn8
+            action=nn8
+        action[1]=np.round((5/(1+np.exp(-action[1]-5))))
+        for x in range(len(action[2:])):
+            action[x+2]=np.round((4/(1+np.exp(-(action[x+2]-4))))-2)
+        boardAction=[action[0],action[1],action[2:]]
+        self.board_policy_backprop_info.append(orig_action)
+        self.action_history_self.append(action)
         return boardAction
         
     def messageAction(self):
@@ -1004,29 +1044,24 @@ class agentOne():
         self.totalSpeakingReward_history.append(totalSpeakingReward)
         self.totalListeningReward_history.append(totalListeningReward)
 
-        boardRewardAvg=sum(self.boardReward_history)/len(self.boardReward_history)
-        boardRewardRegularized=boardReward/boardRewardAvg
-        generalRewardAvg=sum(self.generalReward_history)/len(self.generalReward_history)
-        generalRewardRegularized=generalReward/generalRewardAvg
-        totalSpeakingRewardAvg=sum(self.totalSpeakingReward_history)/len(self.totalSpeakingReward_history)
-        totalSpeakingRewardRegularized=totalSpeakingReward/totalSpeakingRewardAvg
-        totalListeningRewardAvg=sum(self.totalListeningReward_history)/len(self.totalListeningReward_history)
-        totalListeningRewardRegularized=totalListeningReward/totalListeningRewardAvg
-
         ####This code amalgamates the reward into one value:####
-        totalRewardAvg=(boardRewardRegularized+generalRewardRegularized+totalSpeakingRewardRegularized+totalListeningRewardRegularized)/4
+        totalReward=boardReward+generalReward+totalSpeakingReward+totalListeningReward
+        totalBoardReward=boardReward+generalReward
+        totalMesagReward=generalReward+totalSpeakingReward+totalListeningReward
         ##This code calculates the value of the current state
         currentStateValue1=swish(np.matmul(self.value_fn_params,absoluteState1))
         oldStateValue1=swish(np.matmul(self.value_fn_params,oldAbsoluteState1))
-
         
         ####This code calculates the value function error, which is important in getting the error of the other states. It also updates the value function####
         valueDiscount=0.1
         stepSizeValue=0.01
         #y'=y+sigmoid(x)*(1-y)...this is multiplied by the old state because to do the backprop thing u have to back propogate all the way from the value to the input
         value_derivative=oldStateValue1+sigmoid(np.matmul(self.value_fn_params,oldAbsoluteState1))*(1-oldStateValue1)
-        valueError=totalRewardAvg+(0.1*currentStateValue1)-oldStateValue1
-        self.value_fn_params=self.value_fn_params+stepSizeValue*valueError*value_derivative*oldAbsoluteState1
+        valueError=totalReward+(0.1*currentStateValue1)-oldStateValue1
+        valueErrorBoard=totalBoardReward+(0.1*currentStateValue1)-oldStateValue1
+        valueErrorMesag=totalMesagReward+(0.1*currentStateValue1)-oldStateValue1
+        #self.value_fn_params=self.value_fn_params+stepSizeValue*valueError*value_derivative*oldAbsoluteState1
+        self.value_fn_params=self.value_fn_params+stepSizeValue*valueError*value_derivative
         
         ####This code calculates the new values for the board policy####
         stepSizeBoard=0.01
@@ -1034,7 +1069,8 @@ class agentOne():
         mean_board=self.board_policy_backprop_info[-2][1:]
         ##
         p1=[1/x**2 for x in standard_deviation_board]
-        p2=[stepSizeBoard-x for x in mean_board]
+        p2=self.board_policy_backprop_info[-1][1:]-(np.matmul(self.board_policy_params,oldAbsoluteState1)+self.board_policy_biases)
+        #p2=[stepSizeBoard-x for x in mean_board]
         p3=np.multiply(p1,p2)
         self.board_policy_biases=self.board_policy_biases+[stepSizeBoard*x for x in p3]
         #
@@ -1069,8 +1105,10 @@ class agentOne():
         #p5=np.matmul(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState1)))))
         gradient_std_board=p5
         ##
-        self.board_policy_params=self.board_policy_params+np.multiply((stepSizeBoard*self.I*valueError),gradient_mean_board)
-        self.board_policy_std_params=self.board_policy_std_params+np.multiply((stepSizeBoard*self.I*valueError),gradient_std_board)
+        #self.board_policy_params=self.board_policy_params+np.multiply((stepSizeBoard*self.I*valueError),gradient_mean_board)
+        #self.board_policy_std_params=self.board_policy_std_params+np.multiply((stepSizeBoard*self.I*valueError),gradient_std_board)
+        self.board_policy_params=self.board_policy_params+np.multiply((stepSizeBoard*self.I*valueErrorBoard),gradient_mean_board)
+        self.board_policy_std_params=self.board_policy_std_params+np.multiply((stepSizeBoard*self.I*valueErrorBoard),gradient_std_board)
         
         ####This code calculates the new values for the message policy####
         stepSizeMessage=0.01
@@ -1078,7 +1116,8 @@ class agentOne():
         mean_message=self.msg_policy_backprop_info[-2]
         ##
         p1=[1/x**2 for x in standard_deviation_message]
-        p2=[stepSizeMessage-x for x in mean_message]
+        p2=self.msg_policy_backprop_info[-1]-(np.matmul(self.msg_policy_params,oldAbsoluteState1)+self.msg_policy_biases)
+        #p2=[stepSizeMessage-x for x in mean_message]
         p3=np.multiply(p1,p2)
         self.msg_policy_biases=self.msg_policy_biases+[stepSizeMessage*x for x in p3]
         #
@@ -1113,8 +1152,10 @@ class agentOne():
         #p5=np.matmul(np.array(list(zip(p4))),np.transpose(np.array(list(zip(oldAbsoluteState1)))))
         gradient_std_message=p5
         ##
-        self.msg_policy_params=self.msg_policy_params+np.multiply((stepSizeMessage*self.I*valueError),gradient_mean_message)
-        self.msg_policy_std_params=self.msg_policy_std_params+np.multiply((stepSizeMessage*self.I*valueError),gradient_std_message)
+        #self.msg_policy_params=self.msg_policy_params+np.multiply((stepSizeMessage*self.I*valueError),gradient_mean_message)
+        #self.msg_policy_std_params=self.msg_policy_std_params+np.multiply((stepSizeMessage*self.I*valueError),gradient_std_message)
+        self.msg_policy_params=self.msg_policy_params+np.multiply((stepSizeMessage*self.I*valueErrorMesag),gradient_mean_message)
+        self.msg_policy_std_params=self.msg_policy_std_params+np.multiply((stepSizeMessage*self.I*valueErrorMesag),gradient_std_message)
         
         self.I=self.I*valueDiscount
         ####This code does gradient passing back to the FFN's####
@@ -1187,7 +1228,7 @@ class agentOne():
             self.lstm_biases[x][2]=np.transpose(self.lstm_biases[x][2]+r*gaError)
             self.lstm_biases[x][3]=np.transpose(self.lstm_biases[x][3]+r*oaError)
 
-        return totalRewardAvg
+        return totalReward, boardReward, generalReward, totalSpeakingReward, totalListeningReward
 
 
 #output function to track
@@ -1201,9 +1242,10 @@ agent2avg=0
 agent3avg=0
 episode_data=[]
 
-def turn_output(agent1message,agent2message,agent3message,agent1action,agent2action,agent3action,total_reward_1,total_reward_2,total_reward_3):
+def turn_output(agent1message,agent2message,agent3message,agent1action,agent2action,agent3action,total_reward_1,total_reward_2,total_reward_3,component1,component2,component3):
     global episode_data
-    episode_data.append([agent1message,agent2message,agent3message,agent1action,agent2action,agent3action,total_reward_1,total_reward_2,total_reward_3])
+    episode_data.append([agent1message,agent2message,agent3message,agent1action,agent2action,agent3action,total_reward_1,total_reward_2,total_reward_3[1:-2],component1,component2,component3])
+    print(len(episode_data))
 
 def episode_csv():
     global episode_data, episode
@@ -1268,7 +1310,7 @@ while True:
         currentStateValue2=agentTwo.stateValue(absoluteState2)
         oldStateValue1=agentOne.stateValue(oldAbsoluteState1)
         oldStateValue2=agentTwo.stateValue(oldAbsoluteState2)
-        (relations,total_reward_3)=agentThree.updateParameters(oldAbsoluteState3,absoluteState3,currentStateValue1,currentStateValue2,oldStateValue1,oldStateValue2,reward)
+        (relations,total_reward_3, boardRewardRegularized3, generalRewardRegularized3, totalSpeakingRewardRegularized3, totalListeningRewardRegularized3)=agentThree.updateParameters(oldAbsoluteState3,absoluteState3,currentStateValue1,currentStateValue2,oldStateValue1,oldStateValue2,reward)
         print("agent Three round done")
         ###AGENT ONE ROUND###
         checkers.updateState(relations)
@@ -1285,7 +1327,7 @@ while True:
         (totalSpeakingReward, totalListeningReward)=checkers.envStepMessage(agentOne.msgStateHistory,agentOne.message_history_self,agentOne.action_history_self,agentOne.external_message_history)
         reward=[boardReward,generalReward,totalSpeakingReward,totalListeningReward]
         (oldAbsoluteState1,oldAbsoluteState2,oldAbsoluteState3, fullState)=checkers.prepNewState(messageAction,isTerminal,reward,currentState,absoluteState1,absoluteState2,absoluteState3,1)
-        total_reward_1=agentOne.updateParameters(oldAbsoluteState1,absoluteState1,reward)
+        (total_reward_1, boardRewardRegularized1, generalRewardRegularized1, totalSpeakingRewardRegularized1, totalListeningRewardRegularized1)=agentOne.updateParameters(oldAbsoluteState1,absoluteState1,reward)
         print("agent One round done")
         ###AGENT TWO ROUND###
         absoluteState3=agentThree.stateConcatThree(fullState,1)
@@ -1301,10 +1343,10 @@ while True:
         (totalSpeakingReward, totalListeningReward)=checkers.envStepMessage(agentTwo.msgStateHistory,agentTwo.message_history_self,agentTwo.action_history_self,agentTwo.external_message_history)
         reward=[boardReward,generalReward,totalSpeakingReward,totalListeningReward]
         (oldAbsoluteState1,oldAbsoluteState2,oldAbsoluteState3, fullState)=checkers.prepNewState(messageAction,isTerminal,reward,currentState,absoluteState1,absoluteState2,absoluteState3,2)
-        total_reward_2=agentTwo.updateParameters(oldAbsoluteState2,absoluteState2,reward)
+        (total_reward_2, boardRewardRegularized2, generalRewardRegularized2, totalSpeakingRewardRegularized2, totalListeningRewardRegularized2)=agentTwo.updateParameters(oldAbsoluteState2,absoluteState2,reward)
         print("agent Two round done")
         ### still needs to be finished
-        turn_output(agent1message,agent2message,agent3message,agent1action,agent2action,agent3action,total_reward_1,total_reward_2,total_reward_3)
+        turn_output(agent1message,agent2message,agent3message,agent1action,agent2action,agent3action,total_reward_1,total_reward_2,total_reward_3,[boardRewardRegularized1, generalRewardRegularized1, totalSpeakingRewardRegularized1, totalListeningRewardRegularized1],[boardRewardRegularized2, generalRewardRegularized2, totalSpeakingRewardRegularized2, totalListeningRewardRegularized2],[boardRewardRegularized3, generalRewardRegularized3, totalSpeakingRewardRegularized3, totalListeningRewardRegularized3])
         plotter_avg(total_reward_1,total_reward_2,total_reward_3)
         if isTerminal==True:
             terminal=True
