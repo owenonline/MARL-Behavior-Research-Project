@@ -3,6 +3,7 @@ import matplotlib.pyplot as plot
 import os
 from rl_glue import RLGlue
 from tqdm import tqdm
+import numpy as np
 
 class checkersEnvironment():
     def envInit(self):
@@ -102,31 +103,51 @@ class checkersEnvironment():
 
 class agentThree():
     def __init__(self):
-        lstm_msg1_params=[]
-        lstm_msg2_params=[]
-        lstm_msg3_params=[]
-        lstm_msg4_params=[]
-        msg_ffn_params=[]
-        value_fn_params=[]
-        board_policy_params=[]
-        msg_policy_params=[]
+        #each lstm has 4 weights and 4 biases see https://www.kaggle.com/navjindervirdee/lstm-neural-network-from-scratch and http://colah.github.io/posts/2015-08-Understanding-LSTMs/
+        self.lstm_msg1_params=[[randint(-1,1) for x in range(100)],1,[randint(-1,1) for x in range(100)],1,[randint(-1,1) for x in range(100)],1,[randint(-1,1) for x in range(100)]]
+        self.lstm_msg2_params=[[randint(-1,1) for x in range(100)],1,[randint(-1,1) for x in range(100)],1,[randint(-1,1) for x in range(100)],1,[randint(-1,1) for x in range(100)]]
+        self.lstm_msg3_params=[[randint(-1,1) for x in range(100)],1,[randint(-1,1) for x in range(100)],1,[randint(-1,1) for x in range(100)],1,[randint(-1,1) for x in range(100)]]
+        self.lstm_msg4_params=[[randint(-1,1) for x in range(100)],1,[randint(-1,1) for x in range(100)],1,[randint(-1,1) for x in range(100)],1,[randint(-1,1) for x in range(100)]]
+        self.lstm_board_params=[[randint(-1,1) for x in range(12)],1,[randint(-1,1) for x in range(12)],1,[randint(-1,1) for x in range(12)],1,[randint(-1,1) for x in range(12)]]
+        #ffn is gonna have 2 layers each with relu that cut the length down. 412->309->206
+        self.ffn_params=[]
+        self.value_fn_params=[]
+        self.board_policy_params=[]
+        self.msg_policy_params=[]
+        self.cell_state=[]
         
     def stateConcatThree(fullState):
+        reward=fullState[0]
+        boardState=fullState[1]
+        isTerminal=fullState[2]
+        messageOne=fullState[3][0]
+        messageTwo=fullState[3][1]
+        messageThree=fullState[3][2]
+        messageFour=fullState[3][3]
+        relationVals=fullState[4]
         
-
+        
+        
 class agentTwo():
     def __init__(self):
         lstm_msg1_params=[]
         lstm_msg2_params=[]
         lstm_msg3_params=[]
         lstm_msg4_params=[]
-        msg_ffn_params=[]
+        ffn_params=[]
         value_fn_params=[]
         board_policy_params=[]
         msg_policy_params=[]
         
     def stateConcatTwo(fullState):
-        
+        reward=fullState[0]
+        boardState=fullState[1]
+        isTerminal=fullState[2]
+        messageOne=fullState[3][0]
+        messageTwo=fullState[3][1]
+        messageThree=fullState[3][2]
+        messageFour=fullState[3][3]
+        relationVals=fullState[4]
 
 class agentOne():
     def __init__(self):
@@ -134,12 +155,20 @@ class agentOne():
         lstm_msg2_params=[]
         lstm_msg3_params=[]
         lstm_msg4_params=[]
-        msg_ffn_params=[]
+        ffn_params=[]
         value_fn_params=[]
         board_policy_params=[]
         msg_policy_params=[]
         
     def stateConcatOne(fullState):
+        reward=fullState[0]
+        boardState=fullState[1]
+        isTerminal=fullState[2]
+        messageOne=fullState[3][0]
+        messageTwo=fullState[3][1]
+        messageThree=fullState[3][2]
+        messageFour=fullState[3][3]
+        relationVals=fullState[4]
 
 def main():
     checkers=checkersEnvironment()
