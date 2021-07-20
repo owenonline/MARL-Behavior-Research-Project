@@ -194,7 +194,7 @@ class agentThree():
         self.ffn_biases=[0,0]
         self.ffn_outputs=[[],[]]
         
-        self.value_fn_params=[]
+        self.value_fn_params=np.random.normal(0,0.1,(1,363))
         
         self.board_policy_params=[np.random.normal(0,0.1,(318,363)),np.random.normal(0,0.1,(273,318)),np.random.normal(0,0.1,(228,273)),np.random.normal(0,0.1,(183,228)),np.random.normal(0,0.1,(138,183)),np.random.normal(0,0.1,(93,138)),np.random.normal(0,0.1,(48,93)),np.random.normal(0,0.1,(8,48))]
         self.board_policy_biases=[0,0,0,0,0,0,0,0]
@@ -227,9 +227,12 @@ class agentThree():
         messageThree=fullState[3][2]
         messageFour=fullState[3][3]
         relationVals=fullState[4]
+        print("x")
+        #error here on second run
         self.external_message_history.append(np.concatenate((messageThree,messageFour)))
+        print("y")
         lstm_inputs=[messageOne,messageTwo,messageThree,messageFour,boardState,relationVals]
-
+        
         for x in range(len(lstm_inputs)):
             concat_input=np.concatenate((lstm_inputs[x],self.lstm_recursive_info[x][1]))
 
@@ -255,7 +258,7 @@ class agentThree():
         absolute_state=np.concatenate((self.lstm_recursive_info[0][1],self.lstm_recursive_info[1][1],self.lstm_recursive_info[2][1],self.lstm_recursive_info[3][1],self.lstm_recursive_info[4][1],self.lstm_recursive_info[5][1]))
         self.ffn_outputs[0]=relu(np.matmul(self.ffn_params[0],absolute_state)+self.ffn_biases[0])
         self.ffn_outputs[1]=relu(np.matmul(self.ffn_params[1],self.ffn_outputs[0])+self.ffn_biases[1])
-        #ffn_2 is the networks perception of the state distilled from memory and feed forward layers. This also adds the state to the list of every absolute state.
+        #ffn_2 is the networks perception of the state distilled from memory and feed forward layers. This also adds the state to the list of every absolute state; len 363
         self.absolute_state_history.append(self.ffn_outputs[1])
         return self.ffn_outputs[1]
 
@@ -316,8 +319,9 @@ class agentTwo():
         self.ffn_params=[np.random.normal(0,0.1,(425,850)),np.random.normal(0,0.1,(200,425))]
         self.ffn_biases=[0,0]
         self.ffn_outputs=[[],[]]
-        
-        self.value_fn_params=[]
+
+        #im using linear value function approximation
+        self.value_fn_params=np.random.normal(0,0.1,(1,200))
 
         self.board_policy_params=[np.random.normal(0,0.1,(176,200)),np.random.normal(0,0.1,(152,176)),np.random.normal(0,0.1,(128,152)),np.random.normal(0,0.1,(104,128)),np.random.normal(0,0.1,(80,104)),np.random.normal(0,0.1,(56,80)),np.random.normal(0,0.1,(32,56)),np.random.normal(0,0.1,(7,32))]
         self.board_policy_biases=[0,0,0,0,0,0,0,0]
@@ -376,7 +380,7 @@ class agentTwo():
         absolute_state=np.concatenate((self.lstm_recursive_info[0][1],self.lstm_recursive_info[1][1],self.lstm_recursive_info[2][1],self.lstm_recursive_info[3][1]))
         self.ffn_outputs[0]=relu(np.matmul(self.ffn_params[0],absolute_state)+self.ffn_biases[0])
         self.ffn_outputs[1]=relu(np.matmul(self.ffn_params[1],self.ffn_outputs[0])+self.ffn_biases[1])
-        #ffn_2 is the networks perception of the state distilled from memory and feed forward layers
+        #ffn_2 is the networks perception of the state distilled from memory and feed forward layers; len 200
         self.absolute_state_history.append(self.ffn_outputs[1])
         return self.ffn_outputs[1]
 
@@ -416,6 +420,10 @@ class agentTwo():
         self.msg_policy_backprop_info=[nn1,nn2,nn3,nn4,nn5,nn6,nn7,nn8,nn9,nn10]
         self.message_history_self.append(nn10)
         return messageAction
+    
+    def stateValue(self, absoluteState2):
+        currentStateValue1=np.matmul(self.value_fn_params,absoluteState2)
+        return currentStateValue2
         
             
 class agentOne():
@@ -435,7 +443,8 @@ class agentOne():
         self.ffn_biases=[0,0]
         self.ffn_outputs=[[],[]]
         
-        self.value_fn_params=[]
+        #im using linear value function approximation
+        self.value_fn_params=np.random.normal(0,0.1,(1,200))
         
         self.board_policy_params=[np.random.normal(0,0.1,(176,200)),np.random.normal(0,0.1,(152,176)),np.random.normal(0,0.1,(128,152)),np.random.normal(0,0.1,(104,128)),np.random.normal(0,0.1,(80,104)),np.random.normal(0,0.1,(56,80)),np.random.normal(0,0.1,(32,56)),np.random.normal(0,0.1,(7,32))]
         self.board_policy_biases=[0,0,0,0,0,0,0,0]
@@ -495,7 +504,7 @@ class agentOne():
         absolute_state=np.concatenate((self.lstm_recursive_info[0][1],self.lstm_recursive_info[1][1],self.lstm_recursive_info[2][1],self.lstm_recursive_info[3][1]))
         self.ffn_outputs[0]=relu(np.matmul(self.ffn_params[0],absolute_state)+self.ffn_biases[0])
         self.ffn_outputs[1]=relu(np.matmul(self.ffn_params[1],self.ffn_outputs[0])+self.ffn_biases[1])
-        #ffn_2 is the networks perception of the state distilled from memory and feed forward layers
+        #ffn_2 is the networks perception of the state distilled from memory and feed forward layers; len 200
         self.absolute_state_history.append(self.ffn_outputs[1])
         return self.ffn_outputs[1]
 
@@ -536,6 +545,10 @@ class agentOne():
         self.message_history_self.append(nn10)
         return messageAction
 
+    def stateValue(self, absoluteState1):
+        currentStateValue1=np.matmul(self.value_fn_params,absoluteState1)
+        return currentStateValue1
+
 #main program
 checkers=checkersEnvironment()
 agentOne=agentOne()
@@ -545,20 +558,29 @@ agentThree=agentThree()
 checkers.envInit()
 fullState=checkers.envStart()
 
+###AGENT ONE ROUND###
+#set new states
 absoluteState3=agentThree.stateConcatThree(fullState)
 absoluteState2=agentTwo.stateConcatTwo(fullState)
 absoluteState1=agentOne.stateConcatOne(fullState)
-
+#get actions
 boardAction=agentThree.boardAction()
 messageAction=agentThree.messageAction()
 
+#get rewards
 (currentState, isTerminal, boardReward, generalReward)=checkers.envStepBoard(boardAction)
-(totalSpeakingReward, totalListeningReward)=checkers.envStepMessage(agentThree.absolute_state_history,agentThree.message_history_self,agentThree.action_history_self)
-#the one is a hacky solution for knowing what messages to replace. in this case it says that it's agent 1's turn to act
+(totalSpeakingReward, totalListeningReward)=checkers.envStepMessage(agentThree.absolute_state_history,agentThree.message_history_self,agentThree.action_history_self,agentThree.external_message_history)
 reward=[boardReward,generalReward,totalSpeakingReward,totalListeningReward]
+#the one is a hacky solution for knowing what messages to replace. in this case it says that it's agent 1's turn to act
+#get new states
 (oldAbsoluteState1,oldAbsoluteState2,oldAbsoluteState3, fullState)=checkers.prepNewState(messageAction,isTerminal,reward,currentState,absoluteState1,absoluteState2,absoluteState3,1)
 absoluteState3=agentThree.stateConcatThree(fullState)
 absoluteState2=agentTwo.stateConcatTwo(fullState)
 absoluteState1=agentOne.stateConcatOne(fullState)
 #at this point I need to whip out the machine learning textbook and dust it off and re-learn how to use function approximation for a state value function
 #then, I need to dust off my designer thinking cap and get to work learning how to do back propogation on the value function and um uh hmm uh policy function
+currentStateValue1=agentOne.stateValue(absoluteState1)
+currentStateValue2=agentTwo.stateValue(absoluteState2)
+oldStateValue1=agentOne.stateValue(oldAbsoluteState1)
+oldStateValue2=agentTwo.stateValue(oldAbsoluteState2)
+#now im at the point where I can finally write the most difficult method of the whole program
