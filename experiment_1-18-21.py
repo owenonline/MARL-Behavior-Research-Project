@@ -129,7 +129,20 @@ class checkersEnvironment():
 
         return (currentState, isTerminal, boardReward, generalReward)
 
-    def envStepMessage(self,messageAction,boardAction):
+    def envStepMessage(self,stateHistory,messageHistory,actionHistory):
+        totalSpeakingReward=0
+        for x in range(len(stateHistory)-1):
+            msgDiff=np.absolute(messageHistory[-1]-messageHistory[x]).mean()
+            stateDiff=np.absolute(stateHistory[-1]-stateHistory[x]).mean
+
+            msgDiff=1/(1-np.exp(-(msgDiff-4)))
+            stateDiff=1/(1-np.exp(-(stateDiff-4)))
+
+            #lambdaVar is a hyperparameter to make sure there are no divide by zero errors in case the difference between msgDiff and stateDiff is 0
+            lambdaVar=0.0001
+            totalSpeakingReward=totalSpeakingReward+(1/(np.absolute(msgDiff-stateDiff)+lambdaVar))
+        totalSpeakingReward=totalSpeakingReward/len(stateHistory)
+        #now it's time to get the listening reward.
         print("Not yet implemented")
 
     def prepNewState(self,messageAction,currentState,absoluteState1,absoluteState2,absoluteState3):
@@ -162,6 +175,11 @@ class agentThree():
         self.msg_policy_params=[np.random.normal(0,0.1,(343,363)),np.random.normal(0,0.1,(323,343)),np.random.normal(0,0.1,(303,323)),np.random.normal(0,0.1,(283,303)),np.random.normal(0,0.1,(243,283)),np.random.normal(0,0.1,(223,243)),np.random.normal(0,0.1,(203,223)),np.random.normal(0,0.1,(200,203))]
         self.msg_policy_biases=[0,0,0,0,0,0,0,0]
         self.msg_policy_backprop_info=[]
+
+        #the following three lists hold first every absolute state that the agent takes an action from, second every message the agent generates, and third every action the agent takes. They go by time step
+        self.absolute_state_history=[]
+        self.message_history_self=[]
+        self.action_history_self=[]
         
     def stateConcatThree(self, fullState):
         reward=fullState[0]
@@ -205,7 +223,8 @@ class agentThree():
         absolute_state=np.concatenate((self.lstm_recursive_info[0][1],self.lstm_recursive_info[1][1],self.lstm_recursive_info[2][1],self.lstm_recursive_info[3][1],self.lstm_recursive_info[4][1],self.lstm_recursive_info[5][1]))
         self.ffn_outputs[0]=relu(np.matmul(self.ffn_params[0],absolute_state)+self.ffn_biases[0])
         self.ffn_outputs[1]=relu(np.matmul(self.ffn_params[1],self.ffn_outputs[0])+self.ffn_biases[1])
-        #ffn_2 is the networks perception of the state distilled from memory and feed forward layers
+        #ffn_2 is the networks perception of the state distilled from memory and feed forward layers. This also adds the state to the list of every absolute state.
+        self.absolute_state_history.append(self.ffn_outputs[1])
         return self.ffn_outputs[1]
 
     def boardAction(self):
@@ -228,6 +247,7 @@ class agentThree():
             nn8[x+2]=np.round((4/(1+np.exp(-(nn8[1]-4))))-2)
         boardAction=[nn8[0],nn8[1],nn8[2:]]
         self.board_policy_backprop_info=[nn1,nn2,nn3,nn4,nn5,nn6,nn7,orig_nn8]
+        self.action_history_self.append(nn8)
         return boardAction
 
     def messageAction(self):
@@ -244,6 +264,7 @@ class agentThree():
         message2=nn8[100:199]
         messageAction=[message1,message2]
         self.msg_policy_backprop_info=[nn1,nn2,nn3,nn4,nn5,nn6,nn7,nn8]
+        self.message_history_self.append(nn8)
         return messageAction
         
         
@@ -476,6 +497,4 @@ boardAction=agentThree.boardAction()
 messageAction=agentThree.messageAction()
 
 (currentState, isTerminal, boardReward, generalReward)=checkers.envStepBoard(boardAction)
-    
-
-
+(listeningReward,messagingReward)=checkers.envStepMessage(agentThree.absolute_state_history,agentThree.message_history_self,agentThree.action_history_self)
